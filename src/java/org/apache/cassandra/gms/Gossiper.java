@@ -111,6 +111,8 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     // protocol versions of the other nodes in the cluster
     private final ConcurrentMap<InetAddress, Integer> versions = new NonBlockingHashMap<InetAddress, Integer>();
 
+    public int deadCount = 0;
+
     private class GossipTask implements Runnable
     {
         public void run()
@@ -190,6 +192,38 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
         {
             throw new RuntimeException(e);
         }
+	Thread infoPrinter = new Thread(new Runnable() {
+
+            @Override
+            public void run() {
+                String thisAddress = FBUtilities.getBroadcastAddress().toString();
+                while (true) {
+                    int seenNode = endpointStateMap.size();
+                    int deadNode = 0;
+                    int memberNode = 0;
+                    for (InetAddress address : endpointStateMap.keySet()) {
+                        EndpointState state = endpointStateMap.get(address);
+                        boolean isMember = StorageService.instance.getTokenMetadata().isMember(address);
+                        if (!state.isAlive()) {
+                            deadNode++;
+                        }
+                        if (isMember) {
+                            memberNode++;
+                        }
+                    }
+                    logger.info("ringinfo " + thisAddress + " seen_nodes = " + seenNode +
+                            " member_nodes = " + memberNode + " dead_nodes = " + deadNode +
+                            " acc_dead " + deadCount);
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+        });
+        infoPrinter.start();
     }
 
     /**
@@ -836,6 +870,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
         liveEndpoints.remove(addr);
         unreachableEndpoints.put(addr, System.currentTimeMillis());
         logger.info("InetAddress {} is now dead.", addr);
+	deadCount++;
         for (IEndpointStateChangeSubscriber subscriber : subscribers)
             subscriber.onDead(addr, localState);
         if (logger.isTraceEnabled())
