@@ -23,11 +23,13 @@ import java.util.Map.Entry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.Pair;
+import org.apache.commons.lang.StringUtils;
+
+import com.google.common.collect.*;
 
 /**
  * This Replication Strategy takes a property file that gives the intended
@@ -81,11 +83,13 @@ public class NetworkTopologyStrategy extends AbstractReplicationStrategy
 
             // collect endpoints in this DC; add in bulk to token meta data for computational complexity
             // reasons (CASSANDRA-3831).
-            Set<Pair<Token, InetAddress>> dcTokensToUpdate = new HashSet<Pair<Token, InetAddress>>();
+            //Set<Pair<Token, InetAddress>> dcTokensToUpdate = new HashSet<Pair<Token, InetAddress>>();
+            Multimap<InetAddress, Token>  dcTokensToUpdate = HashMultimap.create();
             for (Entry<Token, InetAddress> tokenEntry : tokenMetadata.getTokenToEndpointMapForReading().entrySet())
             {
                 if (snitch.getDatacenter(tokenEntry.getValue()).equals(dcName))
-                    dcTokensToUpdate.add(Pair.create(tokenEntry.getKey(), tokenEntry.getValue()));
+                    //dcTokensToUpdate.add(Pair.create(tokenEntry.getKey(), tokenEntry.getValue()));
+                    dcTokensToUpdate.put(tokenEntry.getValue(), tokenEntry.getKey());
             }
             TokenMetadata dcTokens = new TokenMetadata();
             dcTokens.updateNormalTokens(dcTokensToUpdate);
