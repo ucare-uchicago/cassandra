@@ -25,17 +25,13 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
-
-import junit.framework.Assert;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.exceptions.ConfigurationException;
+//import org.apache.cassandra.config.ConfigurationException;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.dht.StringToken;
 import org.apache.cassandra.dht.Token;
@@ -43,16 +39,16 @@ import org.apache.cassandra.dht.Token;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 
+import org.xml.sax.SAXException;
+
 public class NetworkTopologyStrategyTest
 {
     private String table = "Keyspace1";
-    private static final Logger logger = LoggerFactory.getLogger(NetworkTopologyStrategyTest.class);
 
     @Test
-    public void testProperties() throws IOException, ConfigurationException
+    public void testProperties() throws IOException, ParserConfigurationException, SAXException, ConfigurationException
     {
         IEndpointSnitch snitch = new PropertyFileSnitch();
-        DatabaseDescriptor.setEndpointSnitch(snitch);
         TokenMetadata metadata = new TokenMetadata();
         createDummyTokens(metadata, true);
 
@@ -73,10 +69,9 @@ public class NetworkTopologyStrategyTest
     }
 
     @Test
-    public void testPropertiesWithEmptyDC() throws IOException, ConfigurationException
+    public void testPropertiesWithEmptyDC() throws IOException, ParserConfigurationException, SAXException, ConfigurationException
     {
         IEndpointSnitch snitch = new PropertyFileSnitch();
-        DatabaseDescriptor.setEndpointSnitch(snitch);
         TokenMetadata metadata = new TokenMetadata();
         createDummyTokens(metadata, false);
 
@@ -96,6 +91,7 @@ public class NetworkTopologyStrategyTest
         assert 6 == new HashSet<InetAddress>(endpoints).size(); // ensure uniqueness
     }
 
+/*
     @Test
     public void testLargeCluster() throws UnknownHostException, ConfigurationException
     {
@@ -140,6 +136,7 @@ public class NetworkTopologyStrategyTest
             logger.debug(testToken + ": " + endpoints.toString());
         }
     }
+*/
 
     public void createDummyTokens(TokenMetadata metadata, boolean populateDC3) throws UnknownHostException
     {
