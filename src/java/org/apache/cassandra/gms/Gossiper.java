@@ -199,7 +199,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
                             memberNode++;
                         }
                     }
-                    logger.info("ringinfo " + thisAddress + " seen_nodes = " + seenNode +
+                    logger.error("ringinfo " + thisAddress + " seen_nodes = " + seenNode +
                             " member_nodes = " + memberNode + " dead_nodes = " + deadNode +
                             " acc_dead " + deadCount);
                     try {
