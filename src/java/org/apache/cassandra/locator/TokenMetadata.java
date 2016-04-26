@@ -28,13 +28,15 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.collect.*;
 
+import edu.uchicago.cs.ucare.util.Klogger;
+import edu.uchicago.cs.ucare.util.StackTracePrinter;
+
 import org.apache.cassandra.utils.BiMultiValMap;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.SortedBiMultiValMap;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
@@ -46,7 +48,7 @@ public class TokenMetadata
     private static final Logger logger = LoggerFactory.getLogger(TokenMetadata.class);
 
     /* Maintains token to endpoint map of every node in the cluster. */
-    private final BiMultiValMap<Token, InetAddress> tokenToEndpointMap;
+    public final BiMultiValMap<Token, InetAddress> tokenToEndpointMap;
 
     /* Maintains endpoint to host ID map of every node in the cluster */
     private final BiMap<InetAddress, UUID> endpointToHostIdMap;
@@ -474,6 +476,22 @@ public class TokenMetadata
             lock.readLock().unlock();
         }
     }
+    
+    // Added by Korn for debugging
+    public int getTokenSize(InetAddress endpoint) {
+    	if (!isMember(endpoint)) {
+    		return 0;
+    	}
+        lock.readLock().lock();
+        try
+        {
+            return tokenToEndpointMap.inverse().get(endpoint).size();
+        }
+        finally
+        {
+            lock.readLock().unlock();
+        }
+    }
 
     @Deprecated
     public Token getToken(InetAddress endpoint)
@@ -831,7 +849,6 @@ public class TokenMetadata
         try
         {
             Set<InetAddress> eps = tokenToEndpointMap.inverse().keySet();
-
             if (!eps.isEmpty())
             {
                 sb.append("Normal Tokens:");

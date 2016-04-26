@@ -27,9 +27,11 @@ import java.net.UnknownHostException;
 import java.util.*;
 
 import com.google.common.primitives.Longs;
+
+import edu.uchicago.cs.ucare.util.Klogger;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.auth.*;
 import org.apache.cassandra.cache.IRowCacheProvider;
 import org.apache.cassandra.config.Config.RequestSchedulerId;
@@ -123,6 +125,9 @@ public class DatabaseDescriptor
             loadYaml();
         else
             conf = new Config();
+        InetAddress address = getListenAddress();
+        String nodeId = System.getProperty("cassandra.id", "0");
+        Klogger.logger.info("Logical ID is " + nodeId + " address " + address);
     }
     static void loadYaml()
     {

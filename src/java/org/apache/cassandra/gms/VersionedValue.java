@@ -18,12 +18,12 @@
 package org.apache.cassandra.gms;
 
 import java.io.*;
-
 import java.net.InetAddress;
 import java.util.Collection;
 import java.util.UUID;
 
 import com.google.common.collect.Iterables;
+
 import static com.google.common.base.Charsets.ISO_8859_1;
 
 import org.apache.cassandra.db.TypeSizes;
@@ -31,8 +31,11 @@ import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.net.MessagingService;
+import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,6 +52,7 @@ import org.apache.commons.lang.StringUtils;
 
 public class VersionedValue implements Comparable<VersionedValue>
 {
+	private static final Logger logger = LoggerFactory.getLogger(StorageService.class);
 
     public static final IVersionedSerializer<VersionedValue> serializer = new VersionedValueSerializer();
 
@@ -93,6 +97,34 @@ public class VersionedValue implements Comparable<VersionedValue>
     }
 
     @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((value == null) ? 0 : value.hashCode());
+        result = prime * result + version;
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        VersionedValue other = (VersionedValue) obj;
+        if (value == null) {
+            if (other.value != null)
+                return false;
+        } else if (!value.equals(other.value))
+            return false;
+        if (version != other.version)
+            return false;
+        return true;
+    }
+
+    @Override
     public String toString()
     {
         return "Value(" + value + "," + version + ")";
@@ -114,8 +146,9 @@ public class VersionedValue implements Comparable<VersionedValue>
 
         public VersionedValue bootstrapping(Collection<Token> tokens)
         {
-            return new VersionedValue(versionString(VersionedValue.STATUS_BOOTSTRAPPING,
+            VersionedValue bootstrapping = new VersionedValue(versionString(VersionedValue.STATUS_BOOTSTRAPPING,
                                                     makeTokenString(tokens)));
+            return bootstrapping;
         }
 
         public VersionedValue normal(Collection<Token> tokens)

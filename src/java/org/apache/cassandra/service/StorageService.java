@@ -29,20 +29,22 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
 import javax.management.MBeanServer;
 import javax.management.Notification;
 import javax.management.NotificationBroadcasterSupport;
 import javax.management.ObjectName;
 
 import com.google.common.collect.*;
-
 import com.google.common.util.concurrent.AtomicDouble;
+
+import edu.uchicago.cs.ucare.util.Klogger;
+
 import org.apache.cassandra.db.index.SecondaryIndex;
 import org.apache.log4j.Level;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.auth.Auth;
 import org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor;
 import org.apache.cassandra.concurrent.Stage;
@@ -682,8 +684,9 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                 tokens = new ArrayList<Token>();
                 if (DatabaseDescriptor.getReplaceTokens().size() !=0)
                 {
-                    for (String token : DatabaseDescriptor.getReplaceTokens())
+                    for (String token : DatabaseDescriptor.getReplaceTokens()) {
                         tokens.add(StorageService.getPartitioner().getTokenFactory().fromString(token));
+                    }
                 }
                 else
                 {
@@ -728,7 +731,8 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                     if (DatabaseDescriptor.getNumTokens() == 1)
                         logger.warn("Generated random token " + tokens + ". Random tokens will result in an unbalanced ring; see http://wiki.apache.org/cassandra/Operations");
                     else
-                        logger.info("Generated random tokens. tokens are {}", tokens);
+//                        logger.info("Generated random tokens. tokens are {}", tokens);
+                        logger.info("Generated random tokens. tokens are {}", tokens.size());
                 }
                 else
                 {
@@ -947,7 +951,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             throw new IllegalStateException("Unable to contact any seeds!");
         setMode(Mode.JOINING, "Starting to bootstrap...", true);
         new BootStrapper(FBUtilities.getBroadcastAddress(), tokens, tokenMetadata).bootstrap(); // handles token update
-        logger.info("Bootstrap completed! for the tokens {}", tokens);
+        logger.info("Bootstrap completed! for {} tokens", tokens.size());
     }
 
     public boolean isBootstrapMode()
@@ -1211,8 +1215,9 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
      * Note: Any time a node state changes from STATUS_NORMAL, it will not be visible to new nodes. So it follows that
      * you should never bootstrap a new node during a removetoken, decommission or move.
      */
-    public void onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
+    public int onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
     {
+        int update = 0;
         switch (state)
         {
             case STATUS:
@@ -1225,7 +1230,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                 if (moveName.equals(VersionedValue.STATUS_BOOTSTRAPPING))
                     handleStateBootstrap(endpoint, pieces);
                 else if (moveName.equals(VersionedValue.STATUS_NORMAL))
-                    handleStateNormal(endpoint, pieces);
+                    update = handleStateNormal(endpoint, pieces);
                 else if (moveName.equals(VersionedValue.REMOVING_TOKEN) || moveName.equals(VersionedValue.REMOVED_TOKEN))
                     handleStateRemoving(endpoint, pieces);
                 else if (moveName.equals(VersionedValue.STATUS_LEAVING))
@@ -1256,6 +1261,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                 SystemTable.updatePeerInfo(endpoint, "host_id", value.value);
                 break;
         }
+        return update;
     }
 
     private String quote(String value)
@@ -1263,7 +1269,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         return "'" + value + "'";
     }
 
-    private byte[] getApplicationStateValue(InetAddress endpoint, ApplicationState appstate)
+    public byte[] getApplicationStateValue(InetAddress endpoint, ApplicationState appstate)
     {
         String vvalue = Gossiper.instance.getEndpointStateForEndpoint(endpoint).getApplicationState(appstate).value;
         return vvalue.getBytes(ISO_8859_1);
@@ -1294,6 +1300,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
      */
     private void handleStateBootstrap(InetAddress endpoint, String[] pieces)
     {
+        long s = System.currentTimeMillis();
         assert pieces.length >= 2;
 
         // Parse versioned values according to end-point version:
@@ -1326,6 +1333,8 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
 
         if (Gossiper.instance.usesHostId(endpoint))
             tokenMetadata.updateHostId(Gossiper.instance.getHostId(endpoint), endpoint);
+        long t = System.currentTimeMillis() - s;
+        Klogger.logger.info("Handle bootstrap for " + endpoint + " took " + t + " ms");
     }
 
     /**
@@ -1335,9 +1344,12 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
      * @param endpoint node
      * @param pieces STATE_NORMAL,token
      */
-    private void handleStateNormal(final InetAddress endpoint, String[] pieces)
+    private int handleStateNormal(final InetAddress endpoint, String[] pieces)
     {
+        long s = System.currentTimeMillis();
         assert pieces.length >= 2;
+        
+//        Klogger.logger().info("isClientMode = " + isClientMode);
 
         // Parse versioned values according to end-point version:
         //   versions  < 1.2 .....: STATUS,TOKEN
@@ -1442,8 +1454,11 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         tokenMetadata.updateNormalTokens(tokensToUpdateInMetadata, endpoint);
         for (InetAddress ep : endpointsToRemove)
             removeEndpoint(ep);
-        if (!tokensToUpdateInSystemTable.isEmpty())
+        int update = 0;
+        if (!tokensToUpdateInSystemTable.isEmpty()) {
+            update = 1;
             SystemTable.updateTokens(endpoint, tokensToUpdateInSystemTable);
+        }
         if (!localTokensToRemove.isEmpty())
             SystemTable.updateLocalTokens(Collections.<Token>emptyList(), localTokensToRemove);
 
@@ -1459,6 +1474,9 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         }
 
         calculatePendingRanges();
+        long t = System.currentTimeMillis() - s;
+        Klogger.logger.info("Handle normal for " + endpoint + " took " + t + " ms");
+        return update;
     }
 
     /**
@@ -1686,8 +1704,10 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
      */
     private void calculatePendingRanges()
     {
+        long s = System.currentTimeMillis();
         for (String table : Schema.instance.getNonSystemTables())
             calculatePendingRanges(Table.open(table).getReplicationStrategy(), table);
+        long e = System.currentTimeMillis();
     }
 
     // public & static for testing purposes
@@ -1735,8 +1755,9 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
             Collection<Token> tokens = bootstrapTokens.inverse().get(endpoint);
 
             allLeftMetadata.updateNormalTokens(tokens, endpoint);
-            for (Range<Token> range : strategy.getAddressRanges(allLeftMetadata).get(endpoint))
+            for (Range<Token> range : strategy.getAddressRanges(allLeftMetadata).get(endpoint)) {
                 pendingRanges.put(range, endpoint);
+            }
             allLeftMetadata.removeEndpoint(endpoint);
         }
 
@@ -1951,12 +1972,14 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         return changedRanges;
     }
 
-    public void onJoin(InetAddress endpoint, EndpointState epState)
+    public int onJoin(InetAddress endpoint, EndpointState epState)
     {
+        int update = 0;
         for (Map.Entry<ApplicationState, VersionedValue> entry : epState.getApplicationStateMap().entrySet())
         {
-            onChange(endpoint, entry.getKey(), entry.getValue());
+            update += onChange(endpoint, entry.getKey(), entry.getValue());
         }
+        return update;
     }
 
     public void onAlive(InetAddress endpoint, EndpointState state)

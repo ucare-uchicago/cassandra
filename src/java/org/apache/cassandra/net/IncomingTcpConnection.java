@@ -24,13 +24,14 @@ import java.net.SocketException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.gms.Gossiper;
 import org.apache.cassandra.io.util.FastByteArrayInputStream;
 import org.apache.cassandra.streaming.IncomingStreamReader;
 import org.apache.cassandra.streaming.StreamHeader;
 import org.xerial.snappy.SnappyInputStream;
+
+import edu.uchicago.cs.ucare.util.Klogger;
 
 public class IncomingTcpConnection extends Thread
 {
@@ -105,6 +106,7 @@ public class IncomingTcpConnection extends Thread
         DataInputStream in = new DataInputStream(socket.getInputStream());
         int maxVersion = in.readInt();
         from = CompactEndpointSerializationHelper.deserialize(in);
+        Klogger.logger.info("Receiving connection from " + from);
         boolean compressed = MessagingService.getBits(header, 2, 1) == 1;
 
         if (compressed)
@@ -200,7 +202,10 @@ public class IncomingTcpConnection extends Thread
                 timestamp = (timestamp & 0xFFFFFFFF00000000L) | (((partial & 0xFFFFFFFFL) << 2) >> 2);
         }
 
+        long s = System.currentTimeMillis();
         MessageIn message = MessageIn.read(input, version, id);
+        long t = System.currentTimeMillis() - s;
+//        Klogger.logger.info("Reading a message from " + from + " took " + t + " ms");
         if (message == null)
         {
             // callback expired; nothing to do
