@@ -621,6 +621,8 @@ public final class MessagingService implements MessagingServiceMBean
         if (to.equals(FBUtilities.getBroadcastAddress()))
             logger.trace("Message-to-self {} going over MessagingService", message);
 
+        Klogger.logger.info(FBUtilities.getBroadcastAddress() + " sending " + message.verb + " to " + id + "@" + to);
+
         // message sinks are a testing hook
         MessageOut processedMessage = SinkManager.processOutboundMessage(message, id, to);
         if (processedMessage == null)
