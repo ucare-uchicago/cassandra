@@ -621,7 +621,7 @@ public final class MessagingService implements MessagingServiceMBean
         if (to.equals(FBUtilities.getBroadcastAddress()))
             logger.trace("Message-to-self {} going over MessagingService", message);
 
-        Klogger.logger.info(FBUtilities.getBroadcastAddress() + " sending " + message.verb + " to " + id + "@" + to);
+        Klogger.logger.info(message.verb + " sent to " + thisAddress + " to " + to + " id " + id);
 
         // message sinks are a testing hook
         MessageOut processedMessage = SinkManager.processOutboundMessage(message, id, to);
@@ -777,7 +777,8 @@ public final class MessagingService implements MessagingServiceMBean
         Runnable runnable = new MessageDeliveryTask(message, id, timestamp);
         TracingAwareExecutorService stage = StageManager.getStage(message.getMessageType());
         if (message.getMessageType() == Stage.GOSSIP) {
-            Klogger.logger.info(thisAddress + " received " + message + " ; queue size " + ((JMXEnabledThreadPoolExecutor) stage).getQueue().size());
+            //Klogger.logger.info(thisAddress + " received " + message + " ; queue size " + ((JMXEnabledThreadPoolExecutor) stage).getQueue().size());
+          Klogger.logger.info(message.verb + " received from " + message.from + " by " + thisAddress + " id " + id);
         }
         
         assert stage != null : "No stage for message type " + message.verb;
