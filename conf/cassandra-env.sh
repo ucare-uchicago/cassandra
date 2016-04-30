@@ -229,3 +229,7 @@ JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.port=$JMX_PORT"
 JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.ssl=false" 
 JVM_OPTS="$JVM_OPTS -Dcom.sun.management.jmxremote.authenticate=false" 
 JVM_OPTS="$JVM_OPTS $JVM_EXTRA_OPTS"
+
+if [ `uname` == Darwin ]; then
+  JVM_OPTS="$JVM_OPTS -Djava.library.path=$CASSANDRA_HOME/lib"
+fi
