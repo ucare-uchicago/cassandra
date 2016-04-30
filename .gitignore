@@ -1,0 +1,16 @@
+.classpath
+.settings
+.externalToolBuilders
+.project
+build
+gen-java
+
+.DS_Store
+
+scdeploy.conf
+sc.properties
+machinelist
+skiplist
+scdeploy.conf.*
+
+*.pyc
