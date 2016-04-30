@@ -1,0 +1,33 @@
+#!/bin/sh
+
+scriptdir=`dirname $0`
+
+. $scriptdir/readconfig
+
+read_machinelist() {
+  num_real_node=0
+  while read line; do
+    id=`echo $line | awk '{print $1}'`
+    ip=`echo $line | awk '{print $2}'`
+    eval "id_$id=$ip"
+    dumb_ip=`echo $ip | sed 's/\./_/g'`
+    eval "ip_$dumb_ip=$id"
+    num_real_node=`expr $num_real_node + 1`
+  done < $1
+}
+
+getip() {
+  eval "echo \$id_$1"
+}
+
+getid() {
+  dumb_ip=`echo $1 | sed 's/\./_/g'`
+  eval "echo \$ip_$dumb_ip"
+}
+
+if [ $machinelist ]; then
+  read_machinelist $machinelist
+elif [ -f machinelist ]; then
+  read_machinelist machinelist
+fi
+

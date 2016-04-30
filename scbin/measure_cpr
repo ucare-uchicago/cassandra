@@ -1,0 +1,14 @@
+#!/bin/sh
+
+scriptdir=`dirname $0`
+classpath=$scriptdir/../build/classes/main:$scriptdir/../build/classes/thrift:$scriptdir/../test/conf
+for jar in ls $scriptdir/../lib/*.jar; do
+  classpath=$classpath:$jar
+done
+for jar in ls $scriptdir/../build/lib/jars/*.jar; do
+  classpath=$classpath:$jar
+done
+
+jvmargs="-Dfile.encoding=UTF-8 -Dlog4j.defaultInitOverride=true -Dlog4j.configurationFile=log4j-tools.xml"
+
+java $jvmargs -classpath $classpath edu.uchicago.cs.ucare.cassandra.gms.profiling.CalculatePendingRangesProfiler $@ 

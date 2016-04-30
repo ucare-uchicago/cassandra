@@ -1,0 +1,41 @@
+#!/bin/sh
+
+os=`uname`
+if [ ! $os = Linux ]; then
+  echo Multi-machine remote run supports only Linux
+  exit 1
+fi
+
+cwd=`pwd`
+scriptdir=`dirname $0`
+cd $scriptdir
+scriptdir=`pwd`
+cd $cwd
+
+. $scriptdir/readconfig
+
+cd $scriptdir
+
+if ! [ -f $scriptdir/scdeploy.conf.exp ]; then
+  echo There is no $scriptdir/scdeploy.conf.exp ...
+  echo scdeploy.conf.exp is a scdeploy.conf without cassandra_data_dir assigned
+  exit 1
+fi
+
+if [ -z "$test_size" ]; then
+  test_size="4 8 12 16 20"
+fi
+
+for n in $test_size; do
+  ./gen_nmc_machinelist $n
+  cp scdeploy.conf.exp scdeploy.conf.$n
+  echo "cassandra_data_dir=$cassandra_data_dir/n$n" >> scdeploy.conf.$n
+  ./cluster_dir_setup scdeploy.conf.$n
+  ./cluster_start scdeploy.conf.$n
+  sleep 30
+  $scriptdir/../bin/cassandra-cli --host 192.168.1.1 -f $data_creation_file
+  sleep 10
+  ./cluster_stop scdeploy.conf.$n
+  ./cluster_collect_rawdata scdeploy.conf.$n
+done
+

@@ -1,0 +1,16 @@
+#!/bin/sh
+
+cwd=`pwd`
+scriptdir=`dirname $0`
+cd $scriptdir
+scriptdir=`pwd`
+cd $cwd
+
+. $scriptdir/readconfig
+
+cd $scriptdir
+
+for n in `seq 32 32 256`; do
+  ./measure_cpr $n
+done
+

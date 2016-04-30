@@ -1,0 +1,26 @@
+#!/bin/sh
+
+scriptdir=`dirname $0`
+
+. $scriptdir/readconfig
+
+mkdir -p $cassandra_data_dir
+
+if `echo $cassandra_data_dir | grep -q "^/users/tanakorn/"`; then
+  while read -r line ; do
+    id=`echo $line | awk '{print $1}'`
+    ip=`echo $line | awk '{print $2}'`
+    rm -r $cassandra_data_dir/machine$id 2> /dev/null
+    ssh $ip cp -r $operating_dir/lib $cassandra_data_dir/machine$id &
+  done < $machinelist
+  wait
+else
+  while read -r line ; do
+    id=`echo $line | awk '{print $1}'`
+    ip=`echo $line | awk '{print $2}'`
+    rm -r $cassandra_data_dir/machine$id 2> /dev/null
+    scp -r $ip:$operating_dir/lib $cassandra_data_dir/machine$id &
+  done < $machinelist
+  wait
+fi
+

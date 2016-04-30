@@ -1,0 +1,28 @@
+Instructions for working on PRObE cluster 
+
+1. Generate machine list by running `gen_nmc_machinelist`
+gen_nmc_machine.sh receives the number of machines as the first
+argument. Sometime some machines in the cluster cannot start up, and
+we do not want to use those machines, we can tell gen_nmc_machine.sh
+to skip involving them by writing their indexes into a file name
+`skiplist`. The format is one index number per line.
+
+2. Customize scdeploy.conf
+For num_node variable, we should assign how many Cassandra processes in one
+machine. The number of all Cassandra instances = num_node * the number of
+machines
+
+3. Set up alias IP address
+Set up alias IP address by running `cluster_ip_setup`. We have to call this on
+the machine in the cluster not Nome machine (e.g. node-1.scale.ucare-nome.nx).
+
+4. Set up operating directory
+Set up operating directory for every machine in our running by running
+`cluster_dir_setup`. We have to call this on the machine in the cluster not
+Nome machine (e.g. node-1.scale.ucare-nome.nx).
+
+5. Run Cassandra
+Running `cluster_start`
+
+6. Stop Cassandra
+Running `cluster_stop`
