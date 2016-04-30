@@ -1,5 +1,5 @@
 cluster_name: 'Test Cluster'
-initial_token: $token
+initial_token: 
 num_tokens: 32
 hinted_handoff_enabled: true
 max_hint_window_in_ms: 3600000 # one hour

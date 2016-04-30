@@ -30,12 +30,9 @@ mkdir $operating_dir/log
 i=1
 while [ $i -le $num_node ]; do
   ip=192.168.${my_id}.${i}
-  token_id=`expr \( $my_id - 1 \) \* $num_node + $i - 1`
-  #token=`java -cp ../build/classes/main edu.uchicago.cs.ucare.cassandra.util.TokenGenerator $all_node $token_id`
-  token=`java -cp ../lib/apache-cassandra-1.2.0-beta1-SNAPSHOT.jar edu.uchicago.cs.ucare.cassandra.util.TokenGenerator $all_node $token_id`
   cp -r $scriptdir/resources/conf $operating_dir/cassconf/conf$i
   cd $operating_dir/cassconf/conf$i
-  sed "s:\$operating_dir:$operating_dir:g" cassandra.yaml.multi.template | sed "s:\$ip_address:$ip:g" | sed "s:\$machine_id:$my_id:g" | sed "s:\$id:$i:g" | sed "s:\$token:$token:g" > cassandra.yaml
+  sed "s:\$operating_dir:$operating_dir:g" cassandra.yaml.multi.template | sed "s:\$ip_address:$ip:g" | sed "s:\$machine_id:$my_id:g" | sed "s:\$id:$i:g" > cassandra.yaml
   cd $cwd
   i=`expr $i + 1`
 done
