@@ -60,7 +60,8 @@ public class JMXEnabledThreadPoolExecutor extends DebuggableThreadPoolExecutor i
             NamedThreadFactory threadFactory,
             String jmxPath)
     {
-        this(corePoolSize, corePoolSize, keepAliveTime, unit, workQueue, threadFactory, jmxPath);
+//        this(corePoolSize, corePoolSize, keepAliveTime, unit, workQueue, threadFactory, jmxPath);
+        this(16, 16, keepAliveTime, unit, workQueue, threadFactory, jmxPath);
     }
 
     public JMXEnabledThreadPoolExecutor(int corePoolSize,

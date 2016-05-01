@@ -305,7 +305,7 @@ public class SystemTable
     /**
      * Record tokens being used by another node
      */
-    public static synchronized void updateTokens(InetAddress ep, Collection<Token> tokens)
+    public static void updateTokens(InetAddress ep, Collection<Token> tokens)
     {
         if (ep.equals(FBUtilities.getBroadcastAddress()))
         {
@@ -318,7 +318,7 @@ public class SystemTable
         forceBlockingFlush(PEERS_CF);
     }
 
-    public static synchronized void updatePeerInfo(InetAddress ep, String columnName, String value)
+    public static void updatePeerInfo(InetAddress ep, String columnName, String value)
     {
         if (ep.equals(FBUtilities.getBroadcastAddress()))
             return;

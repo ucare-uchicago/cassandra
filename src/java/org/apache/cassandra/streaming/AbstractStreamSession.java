@@ -45,6 +45,7 @@ public abstract class AbstractStreamSession implements IEndpointStateChangeSubsc
         this.table = table;
         this.callback = callback;
         Gossiper.instance.register(this);
+//        Gossiper.registerStatic(this);
         FailureDetector.instance.registerFailureDetectionEventListener(this);
     }
 
@@ -83,8 +84,8 @@ public abstract class AbstractStreamSession implements IEndpointStateChangeSubsc
 
     protected abstract void closeInternal(boolean success);
 
-    public int onJoin(InetAddress endpoint, EndpointState epState) { return 0; }
-    public int onChange(InetAddress endpoint, ApplicationState state, VersionedValue value) { return 0; }
+    public void onJoin(InetAddress endpoint, EndpointState epState) {}
+    public void onChange(InetAddress endpoint, ApplicationState state, VersionedValue value) {}
     public void onAlive(InetAddress endpoint, EndpointState state) {}
     public void onDead(InetAddress endpoint, EndpointState state) {}
 

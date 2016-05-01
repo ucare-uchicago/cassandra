@@ -17,6 +17,8 @@
  */
 package org.apache.cassandra.net;
 
+import static com.google.common.base.Charsets.ISO_8859_1;
+
 import java.io.ByteArrayInputStream;
 import java.io.DataInput;
 import java.io.DataInputStream;
@@ -40,13 +42,13 @@ import javax.management.ObjectName;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 
-import edu.uchicago.cs.ucare.util.Klogger;
+import edu.uchicago.cs.ucare.outdated.WorstCaseGossiperStub;
+import edu.uchicago.cs.ucare.util.StackTracePrinter;
 
 import org.cliffc.high_scale_lib.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.cassandra.concurrent.DebuggableThreadPoolExecutor;
-import org.apache.cassandra.concurrent.JMXEnabledThreadPoolExecutor;
 import org.apache.cassandra.concurrent.Stage;
 import org.apache.cassandra.concurrent.StageManager;
 import org.apache.cassandra.concurrent.TracingAwareExecutorService;
@@ -63,7 +65,6 @@ import org.apache.cassandra.gms.GossipDigestAck2;
 import org.apache.cassandra.gms.GossipDigestSyn;
 import org.apache.cassandra.gms.TokenSerializer;
 import org.apache.cassandra.gms.VersionedValue;
-import org.apache.cassandra.gms.VersionedValue.VersionedValueFactory;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataOutputBuffer;
 import org.apache.cassandra.locator.ILatencySubscriber;
@@ -77,8 +78,6 @@ import org.apache.cassandra.streaming.compress.CompressedFileStreamTask;
 import org.apache.cassandra.tracing.TraceState;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.*;
-
-import static com.google.common.base.Charsets.ISO_8859_1;
 
 public final class MessagingService implements MessagingServiceMBean
 {
@@ -280,8 +279,6 @@ public final class MessagingService implements MessagingServiceMBean
 
     private final List<SocketThread> socketThreads = Lists.newArrayList();
     private final SimpleCondition listenGate;
-    
-    private InetAddress thisAddress;
 
     /**
      * Verbs it's okay to drop if the request has been queued longer than the request timeout.  These
@@ -365,7 +362,6 @@ public final class MessagingService implements MessagingServiceMBean
         {
             throw new RuntimeException(e);
         }
-        thisAddress = FBUtilities.getBroadcastAddress();
     }
 
     /**
@@ -412,7 +408,7 @@ public final class MessagingService implements MessagingServiceMBean
         }
         listenGate.signalAll();
     }
-
+    
     private List<ServerSocket> getServerSocket(InetAddress localEp) throws ConfigurationException
     {
         final List<ServerSocket> ss = new ArrayList<ServerSocket>(2);
@@ -467,7 +463,7 @@ public final class MessagingService implements MessagingServiceMBean
         {
             throw new RuntimeException(e);
         }
-        logger.info("Starting Messaging Service on port {}", DatabaseDescriptor.getStoragePort());
+//        logger.info("Starting Messaging Service on port {}", DatabaseDescriptor.getStoragePort());
         ss.add(socket);
         return ss;
     }
@@ -617,14 +613,12 @@ public final class MessagingService implements MessagingServiceMBean
     {
         if (logger.isTraceEnabled())
             logger.trace(FBUtilities.getBroadcastAddress() + " sending " + message.verb + " to " + id + "@" + to);
-
         if (to.equals(FBUtilities.getBroadcastAddress()))
             logger.trace("Message-to-self {} going over MessagingService", message);
 
-        Klogger.logger.info(message.verb + " sent to " + thisAddress + " to " + to + " id " + id);
-
         // message sinks are a testing hook
-        MessageOut processedMessage = SinkManager.processOutboundMessage(message, id, to);
+//        MessageOut processedMessage = SinkManager.processOutboundMessage(message, id, to);
+        MessageOut processedMessage = message;
         if (processedMessage == null)
         {
             return;
@@ -733,54 +727,69 @@ public final class MessagingService implements MessagingServiceMBean
         MessagingService.Verb verb = message.verb;
         Integer count = messageCount.get(verb);
         if (count == null) {
-        	count = 1;
+            count = 1;
         } else {
-        	count += 1;
+            count += 1;
         }
         messageCount.put(verb, count);
         Object payload = message.payload;
         if (payload instanceof GossipDigestSyn) {
-        	GossipDigestSyn gds = (GossipDigestSyn) payload;
+            GossipDigestSyn gds = (GossipDigestSyn) payload;
         } else if (payload instanceof GossipDigestAck) {
-        	GossipDigestAck gda = (GossipDigestAck) payload;
-        	Map<InetAddress, EndpointState> epsMap = gda.getEndpointStateMap();
-        	nodeInGDA += epsMap.keySet().size();
-        	for (InetAddress address : epsMap.keySet()) {
-        		EndpointState eps = epsMap.get(address);
-        		VersionedValue value = eps.getApplicationState(ApplicationState.TOKENS);
-        		if (value != null) {
-        			try {
-						Collection<Token> tokens = TokenSerializer.deserialize(StorageService.getPartitioner(), new DataInputStream(new ByteArrayInputStream(value.value.getBytes(ISO_8859_1))));
-						vnodeInGDA += tokens.size();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-        		}
-        	}
+            GossipDigestAck gda = (GossipDigestAck) payload;
+            Map<InetAddress, EndpointState> epsMap = gda.getEndpointStateMap();
+            nodeInGDA += epsMap.keySet().size();
+            for (InetAddress address : epsMap.keySet()) {
+                EndpointState eps = epsMap.get(address);
+                VersionedValue value = eps.getApplicationState(ApplicationState.TOKENS);
+                if (value != null) {
+                    try {
+                        Collection<Token> tokens = TokenSerializer.deserialize(StorageService.getPartitioner(), new DataInputStream(new ByteArrayInputStream(value.value.getBytes(ISO_8859_1))));
+                        vnodeInGDA += tokens.size();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
         } else if (payload instanceof GossipDigestAck2) {
-        	GossipDigestAck2 gda2 = (GossipDigestAck2) payload;
-        	Map<InetAddress, EndpointState> epsMap = gda2.getEndpointStateMap();
-        	nodeInGDA2 += epsMap.keySet().size();
-        	for (InetAddress address : epsMap.keySet()) {
-        		EndpointState eps = epsMap.get(address);
-        		VersionedValue value = eps.getApplicationState(ApplicationState.TOKENS);
-        		if (value != null) {
-        			try {
-						Collection<Token> tokens = TokenSerializer.deserialize(StorageService.getPartitioner(), new DataInputStream(new ByteArrayInputStream(value.value.getBytes(ISO_8859_1))));
-						vnodeInGDA2 += tokens.size();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-        		}
-        	}
-        }
-        Runnable runnable = new MessageDeliveryTask(message, id, timestamp);
-        TracingAwareExecutorService stage = StageManager.getStage(message.getMessageType());
-        if (message.getMessageType() == Stage.GOSSIP) {
-            //Klogger.logger.info(thisAddress + " received " + message + " ; queue size " + ((JMXEnabledThreadPoolExecutor) stage).getQueue().size());
-          Klogger.logger.info(message.verb + " received from " + message.from + " by " + thisAddress + " id " + id);
+            GossipDigestAck2 gda2 = (GossipDigestAck2) payload;
+            Map<InetAddress, EndpointState> epsMap = gda2.getEndpointStateMap();
+            nodeInGDA2 += epsMap.keySet().size();
+            for (InetAddress address : epsMap.keySet()) {
+                EndpointState eps = epsMap.get(address);
+                VersionedValue value = eps.getApplicationState(ApplicationState.TOKENS);
+                if (value != null) {
+                    try {
+                        Collection<Token> tokens = TokenSerializer.deserialize(StorageService.getPartitioner(), new DataInputStream(new ByteArrayInputStream(value.value.getBytes(ISO_8859_1))));
+                        vnodeInGDA2 += tokens.size();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
         }
         
+        int[] messageInfo = MessagingService.instance().getMessageInfo();
+        MessagingService.instance().resetMessageInfo();
+        StringBuilder strBuilder = new StringBuilder("sc_debug: MessageInfo\n");
+        strBuilder.append("node in GDA = ");
+        strBuilder.append(messageInfo[0]);
+        strBuilder.append('\n');
+        strBuilder.append("node in GDA2 = ");
+        strBuilder.append(messageInfo[1]);
+        strBuilder.append('\n');
+        strBuilder.append("vnode in GDA = ");
+        strBuilder.append(messageInfo[2]);
+        strBuilder.append('\n');
+        strBuilder.append("vnode in GDA2 = ");
+        strBuilder.append(messageInfo[3]);
+//        logger.info(strBuilder.toString());
+        
+        resetCount();
+        resetMessageInfo();
+        
+        Runnable runnable = new MessageDeliveryTask(message, id, timestamp);
+        TracingAwareExecutorService stage = StageManager.getStage(message.getMessageType());
         assert stage != null : "No stage for message type " + message.verb;
 
         if (message.verb == Verb.REQUEST_RESPONSE && PBSPredictor.instance().isLoggingEnabled())
@@ -799,17 +808,16 @@ public final class MessagingService implements MessagingServiceMBean
 
         stage.execute(runnable, state);
     }
-
-
+    
     // For instrument
     private HashMap<MessagingService.Verb, Integer> messageCount = new HashMap<MessagingService.Verb, Integer>();
     
     public void resetCount() {
-    	messageCount.clear();
+        messageCount.clear();
     }
     
     public HashMap<MessagingService.Verb, Integer> getCount() {
-    	return (HashMap<Verb, Integer>) messageCount.clone();
+        return (HashMap<Verb, Integer>) messageCount.clone();
     }
     
     private int nodeInGDA = 0;
@@ -818,7 +826,7 @@ public final class MessagingService implements MessagingServiceMBean
     private int vnodeInGDA2 = 0;
     
     public int[] getMessageInfo() {
-    	return new int[] { nodeInGDA, nodeInGDA2, vnodeInGDA, vnodeInGDA2 };
+        return new int[] { nodeInGDA, nodeInGDA2, vnodeInGDA, vnodeInGDA2 };
     }
     
     public void resetMessageInfo() {
@@ -827,7 +835,7 @@ public final class MessagingService implements MessagingServiceMBean
         vnodeInGDA = 0;
         vnodeInGDA2 = 0;
     }
-    
+
     public void setCallbackForTests(String messageId, CallbackInfo callback)
     {
         callbacks.put(messageId, callback);
@@ -850,6 +858,7 @@ public final class MessagingService implements MessagingServiceMBean
 
     public static void validateMagic(int magic) throws IOException
     {
+//    	logger.info("korn validating magic");
         if (magic != PROTOCOL_MAGIC)
             throw new IOException("invalid protocol header");
     }

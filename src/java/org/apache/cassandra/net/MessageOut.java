@@ -41,11 +41,14 @@ import static org.apache.cassandra.tracing.Tracing.isTracing;
 public class MessageOut<T>
 {
     public final InetAddress from;
+    public final InetAddress to;
     public final MessagingService.Verb verb;
     public final T payload;
     public final IVersionedSerializer<T> serializer;
     public final Map<String, byte[]> parameters;
-
+    
+    public long wakeUpTime;
+    
     // we do support messages that just consist of a verb
     public MessageOut(MessagingService.Verb verb)
     {
@@ -61,15 +64,43 @@ public class MessageOut<T>
                          : Collections.<String, byte[]>emptyMap());
     }
 
+    public MessageOut(InetAddress from, MessagingService.Verb verb, T payload, IVersionedSerializer<T> serializer)
+    {
+        this(from, verb,
+             payload,
+             serializer,
+             isTracing() ? ImmutableMap.of(TRACE_HEADER, UUIDGen.decompose(Tracing.instance().getSessionId()))
+                         : Collections.<String, byte[]>emptyMap());
+    }
+    
+    public MessageOut(InetAddress from, InetAddress to, MessagingService.Verb verb, T payload, IVersionedSerializer<T> serializer)
+    {
+        this(from, to, verb,
+             payload,
+             serializer,
+             isTracing() ? ImmutableMap.of(TRACE_HEADER, UUIDGen.decompose(Tracing.instance().getSessionId()))
+                         : Collections.<String, byte[]>emptyMap());
+    }
+
     private MessageOut(MessagingService.Verb verb, T payload, IVersionedSerializer<T> serializer, Map<String, byte[]> parameters)
     {
         this(FBUtilities.getBroadcastAddress(), verb, payload, serializer, parameters);
     }
 
-    @VisibleForTesting
     public MessageOut(InetAddress from, MessagingService.Verb verb, T payload, IVersionedSerializer<T> serializer, Map<String, byte[]> parameters)
     {
         this.from = from;
+        this.to = null;
+        this.verb = verb;
+        this.payload = payload;
+        this.serializer = serializer;
+        this.parameters = parameters;
+    }
+
+    public MessageOut(InetAddress from, InetAddress to, MessagingService.Verb verb, T payload, IVersionedSerializer<T> serializer, Map<String, byte[]> parameters)
+    {
+        this.from = from;
+        this.to = to;
         this.verb = verb;
         this.payload = payload;
         this.serializer = serializer;
@@ -81,6 +112,13 @@ public class MessageOut<T>
         ImmutableMap.Builder<String, byte[]> builder = ImmutableMap.builder();
         builder.putAll(parameters).put(key, value);
         return new MessageOut<T>(verb, payload, serializer, builder.build());
+    }
+    
+    public MessageOut<T> copy() {
+        ImmutableMap.Builder<String, byte[]> builder = ImmutableMap.builder();
+        builder.putAll(parameters);
+    	MessageOut<T> msg = new MessageOut<T>(from, verb, payload, serializer, builder.build());
+    	return msg;
     }
 
     public Stage getStage()
@@ -139,4 +177,62 @@ public class MessageOut<T>
         size += longSize;
         return size;
     }
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((from == null) ? 0 : from.hashCode());
+		result = prime * result
+				+ ((parameters == null) ? 0 : parameters.hashCode());
+		result = prime * result + ((payload == null) ? 0 : payload.hashCode());
+		result = prime * result
+				+ ((serializer == null) ? 0 : serializer.hashCode());
+		result = prime * result + ((verb == null) ? 0 : verb.hashCode());
+		return result;
+	}
+
+	public long getWakeUpTime() {
+        return wakeUpTime;
+    }
+
+    public void setWakeUpTime(long wakeUpTime) {
+        this.wakeUpTime = wakeUpTime;
+    }
+
+    @Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		MessageOut other = (MessageOut) obj;
+		if (from == null) {
+			if (other.from != null)
+				return false;
+		} else if (!from.equals(other.from))
+			return false;
+		if (parameters == null) {
+			if (other.parameters != null)
+				return false;
+		} else if (!parameters.equals(other.parameters))
+			return false;
+		if (payload == null) {
+			if (other.payload != null)
+				return false;
+		} else if (!payload.equals(other.payload))
+			return false;
+		if (serializer == null) {
+			if (other.serializer != null)
+				return false;
+		} else if (!serializer.equals(other.serializer))
+			return false;
+		if (verb != other.verb)
+			return false;
+		return true;
+	}
+    
+    
 }

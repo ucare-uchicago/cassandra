@@ -955,7 +955,8 @@ public class CompactionManager implements CompactionManagerMBean
 
         public CompactionExecutor()
         {
-            this(Math.max(1, DatabaseDescriptor.getConcurrentCompactors()), "CompactionExecutor");
+//            this(Math.max(1, DatabaseDescriptor.getConcurrentCompactors()), "CompactionExecutor");
+            this(16, "CompactionExecutor");
         }
 
         protected void beforeExecute(Thread t, Runnable r)

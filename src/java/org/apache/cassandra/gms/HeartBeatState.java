@@ -18,6 +18,7 @@
 package org.apache.cassandra.gms;
 
 import java.io.*;
+import java.net.InetAddress;
 
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.io.IVersionedSerializer;
@@ -25,40 +26,44 @@ import org.apache.cassandra.io.IVersionedSerializer;
 /**
  * HeartBeat State associated with any given endpoint.
  */
-class HeartBeatState
+public class HeartBeatState
 {
     public static final IVersionedSerializer<HeartBeatState> serializer = new HeartBeatStateSerializer();
 
     private int generation;
     private int version;
-
-    HeartBeatState(int gen)
+    
+    public HeartBeatState(int gen)
     {
         this(gen, 0);
     }
 
-    HeartBeatState(int gen, int ver)
+    public HeartBeatState(int gen, int ver)
     {
         generation = gen;
         version = ver;
     }
 
-    int getGeneration()
+    public int getGeneration()
     {
         return generation;
     }
 
-    void updateHeartBeat()
+    public void updateHeartBeat()
     {
         version = VersionGenerator.getNextVersion();
     }
 
-    int getHeartBeatVersion()
+    public void updateHeartBeat(InetAddress address)
+    {
+        version = VersionGenerator.getNextVersion(address);
+    }
+    public int getHeartBeatVersion()
     {
         return version;
     }
 
-    void forceNewerGenerationUnsafe()
+    public void forceNewerGenerationUnsafe()
     {
         generation += 1;
     }
@@ -68,30 +73,34 @@ class HeartBeatState
         return String.format("HeartBeat: generation = %d, version = %d", generation, version);
     }
 
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + generation;
-        result = prime * result + version;
-        return result;
-    }
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + generation;
+		result = prime * result + version;
+		return result;
+	}
 
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        HeartBeatState other = (HeartBeatState) obj;
-        if (generation != other.generation)
-            return false;
-        if (version != other.version)
-            return false;
-        return true;
-    }
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		HeartBeatState other = (HeartBeatState) obj;
+		if (generation != other.generation)
+			return false;
+		if (version != other.version)
+			return false;
+		return true;
+	}
+	
+	public HeartBeatState copy() {
+	    return new HeartBeatState(generation, version);
+	}
 }
 
 class HeartBeatStateSerializer implements IVersionedSerializer<HeartBeatState>

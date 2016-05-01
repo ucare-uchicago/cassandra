@@ -17,6 +17,8 @@
  */
 package org.apache.cassandra.gms;
 
+import java.net.InetAddress;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -27,9 +29,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class VersionGenerator
 {
     private static final AtomicInteger version = new AtomicInteger(0);
+    
+    private static final ConcurrentHashMap<InetAddress, AtomicInteger> versionMap = new ConcurrentHashMap<InetAddress, AtomicInteger>();
 
     public static int getNextVersion()
     {
         return version.incrementAndGet();
+    }
+    
+    public static int getNextVersion(InetAddress address) {
+        if (address == null) {
+            return version.incrementAndGet();
+        }
+        if (!versionMap.containsKey(address)) {
+            versionMap.put(address, new AtomicInteger(0));
+        }
+        return versionMap.get(address).incrementAndGet();
     }
 }

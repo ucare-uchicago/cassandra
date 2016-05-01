@@ -24,7 +24,9 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -33,17 +35,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.jboss.netty.util.internal.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.apache.cassandra.net.MessagingService.Verb;
 import org.apache.cassandra.tracing.TraceState;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.UUIDGen;
 import org.xerial.snappy.SnappyOutputStream;
-
 import org.apache.cassandra.config.Config;
 import org.apache.cassandra.config.DatabaseDescriptor;
+
+import edu.uchicago.cs.ucare.outdated.WorstCaseGossiperStub;
 
 public class OutboundTcpConnection extends Thread
 {
@@ -63,11 +67,15 @@ public class OutboundTcpConnection extends Thread
 
     private final OutboundTcpConnectionPool poolReference;
 
-    private DataOutputStream out;
-    private Socket socket;
+//    private DataOutputStream out;
+//    private Socket socket;
     private volatile long completed;
     private final AtomicLong dropped = new AtomicLong();
     private int targetVersion;
+    
+//    Set<InetAddress> connectedAddresses = java.util.Collections.newSetFromMap(new ConcurrentHashMap<InetAddress, Boolean>());
+    java.util.concurrent.ConcurrentHashMap<InetAddress, Socket> connectedSocketMap = new java.util.concurrent.ConcurrentHashMap<InetAddress, Socket>();
+    java.util.concurrent.ConcurrentHashMap<InetAddress, DataOutputStream> connectedOutMap = new java.util.concurrent.ConcurrentHashMap<InetAddress, DataOutputStream>();
 
     public OutboundTcpConnection(OutboundTcpConnectionPool pool)
     {
@@ -88,6 +96,7 @@ public class OutboundTcpConnection extends Thread
         try
         {
             backlog.put(new QueuedMessage(message, id));
+//            System.out.println(message.payload);
         }
         catch (InterruptedException e)
         {
@@ -136,20 +145,29 @@ public class OutboundTcpConnection extends Thread
             }
 
             MessageOut<?> m = qm.message;
+            InetAddress sendBy = m.from;
             if (m == CLOSE_SENTINEL)
             {
-                disconnect();
+                disconnect(sendBy);
                 if (isStopped)
                     break;
                 continue;
             }
-            if (qm.timestamp < System.currentTimeMillis() - m.getTimeout())
+//            if (qm.timestamp < System.currentTimeMillis() - m.getTimeout())
+//                dropped.incrementAndGet();
+//            else if (socket != null || connectFor(sendBy))
+//                writeConnected(qm);
+//            else
+//                // clear out the queue, else gossip messages back up.
+//                active.clear();
+            if (qm.timestamp < System.currentTimeMillis() - m.getTimeout()) {
                 dropped.incrementAndGet();
-            else if (socket != null || connect())
-                writeConnected(qm);
-            else
+            } else if (connectedSocketMap.containsKey(sendBy) || connectFor(sendBy)) {
+                writeConnectedBy(qm, sendBy);
+            } else {
                 // clear out the queue, else gossip messages back up.
                 active.clear();
+            }
         }
     }
 
@@ -175,7 +193,7 @@ public class OutboundTcpConnection extends Thread
                || (DatabaseDescriptor.internodeCompression() == Config.InternodeCompression.dc && !isLocalDC(poolReference.endPoint()));
     }
 
-    private void writeConnected(QueuedMessage qm)
+    private void writeConnectedBy(QueuedMessage qm, InetAddress sendBy)
     {
         try
         {
@@ -198,6 +216,7 @@ public class OutboundTcpConnection extends Thread
                 }
             }
 
+            DataOutputStream out = connectedOutMap.get(sendBy);
             write(qm.message, qm.id, qm.timestamp, out, targetVersion);
             completed++;
             if (active.peek() == null)
@@ -207,7 +226,7 @@ public class OutboundTcpConnection extends Thread
         }
         catch (Exception e)
         {
-            disconnect();
+            disconnect(sendBy);
             if (e instanceof IOException)
             {
                 if (logger.isDebugEnabled())
@@ -272,6 +291,20 @@ public class OutboundTcpConnection extends Thread
 
     private void disconnect()
     {
+    	for (Socket socket : connectedSocketMap.values()) {
+    		try {
+    			socket.close();
+    		} catch (IOException e) {
+                if (logger.isTraceEnabled())
+                    logger.trace("exception closing connection to " + poolReference.endPoint(), e);
+    		}
+    	}
+    	connectedSocketMap.clear();
+    	connectedOutMap.clear();
+    }
+
+    private void disconnect(InetAddress addr) {
+    	Socket socket = connectedSocketMap.get(addr);
         if (socket != null)
         {
             try
@@ -283,12 +316,14 @@ public class OutboundTcpConnection extends Thread
                 if (logger.isTraceEnabled())
                     logger.trace("exception closing connection to " + poolReference.endPoint(), e);
             }
-            out = null;
-            socket = null;
+            connectedSocketMap.remove(addr);
+            connectedOutMap.remove(addr);
+//            out = null;
+//            socket = null;
         }
     }
 
-    private boolean connect()
+    private boolean connectFor(InetAddress address)
     {
         if (logger.isDebugEnabled())
             logger.debug("attempting to connect to " + poolReference.endPoint());
@@ -297,9 +332,11 @@ public class OutboundTcpConnection extends Thread
         while (System.currentTimeMillis() < start + DatabaseDescriptor.getRpcTimeout())
         {
             targetVersion = MessagingService.instance().getVersion(poolReference.endPoint());
+            Socket socket;
             try
             {
-                socket = poolReference.newSocket();
+                socket = poolReference.newSocket(address);
+                connectedSocketMap.put(address, socket);
                 socket.setKeepAlive(true);
                 if (isLocalDC(poolReference.endPoint()))
                 {
@@ -320,7 +357,8 @@ public class OutboundTcpConnection extends Thread
                         logger.warn("Failed to set send buffer size on internode socket.", se);
                     }
                 }
-                out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 4096));
+                DataOutputStream out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(), 4096));
+                connectedOutMap.put(address, out);
 
                 if (targetVersion >= MessagingService.VERSION_12)
                 {
@@ -336,14 +374,14 @@ public class OutboundTcpConnection extends Thread
                         // a different target version (targetVersion < MessagingService.VERSION_12)
                         // or if the same version the handshake will finally succeed
                         logger.debug("Target max version is {}; no version information yet, will retry", maxTargetVersion);
-                        disconnect();
+                        disconnect(address);
                         continue;
                     }
                     if (targetVersion > maxTargetVersion)
                     {
                         logger.debug("Target max version is {}; will reconnect with that version", maxTargetVersion);
                         MessagingService.instance().setVersion(poolReference.endPoint(), maxTargetVersion);
-                        disconnect();
+                        disconnect(address);
                         return false;
                     }
 
@@ -356,7 +394,9 @@ public class OutboundTcpConnection extends Thread
                     }
 
                     out.writeInt(MessagingService.current_version);
-                    CompactEndpointSerializationHelper.serialize(FBUtilities.getBroadcastAddress(), out);
+//                    logger.info("connecting on behalf of " + address);
+                    CompactEndpointSerializationHelper.serialize(address, out);
+//                    CompactEndpointSerializationHelper.serialize(FBUtilities.getBroadcastAddress(), out);
                     if (shouldCompressConnection())
                     {
                         out.flush();
@@ -396,7 +436,7 @@ public class OutboundTcpConnection extends Thread
             {
                 try
                 {
-                    logger.info("Handshaking version with {}", poolReference.endPoint());
+//                    logger.info("Handshaking version with {}", poolReference.endPoint());
                     version.set(inputStream.readInt());
                 }
                 catch (IOException ex) 

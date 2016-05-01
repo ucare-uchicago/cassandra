@@ -36,24 +36,24 @@ public class GossipDigest implements Comparable<GossipDigest>
     final int generation;
     final int maxVersion;
 
-    GossipDigest(InetAddress ep, int gen, int version)
+    public GossipDigest(InetAddress ep, int gen, int version)
     {
         endpoint = ep;
         generation = gen;
         maxVersion = version;
     }
 
-    InetAddress getEndpoint()
+    public InetAddress getEndpoint()
     {
         return endpoint;
     }
 
-    int getGeneration()
+    public int getGeneration()
     {
         return generation;
     }
 
-    int getMaxVersion()
+    public int getMaxVersion()
     {
         return maxVersion;
     }
@@ -63,17 +63,6 @@ public class GossipDigest implements Comparable<GossipDigest>
         if ( generation != gDigest.generation )
             return ( generation - gDigest.generation );
         return (maxVersion - gDigest.maxVersion);
-    }
-
-    public String toString()
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append(endpoint);
-        sb.append(":");
-        sb.append(generation);
-        sb.append(":");
-        sb.append(maxVersion);
-        return sb.toString();
     }
 
     @Override
@@ -106,6 +95,17 @@ public class GossipDigest implements Comparable<GossipDigest>
         if (maxVersion != other.maxVersion)
             return false;
         return true;
+    }
+
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append(endpoint);
+        sb.append(":");
+        sb.append(generation);
+        sb.append(":");
+        sb.append(maxVersion);
+        return sb.toString();
     }
 }
 

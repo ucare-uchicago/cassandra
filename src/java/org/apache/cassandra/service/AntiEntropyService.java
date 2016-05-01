@@ -677,6 +677,7 @@ public class AntiEntropyService
 
             AntiEntropyService.instance.sessions.put(getName(), this);
             Gossiper.instance.register(this);
+//            Gossiper.registerStatic(this);
             FailureDetector.instance.registerFailureDetectionEventListener(this);
             try
             {
@@ -775,8 +776,8 @@ public class AntiEntropyService
             forceShutdown();
         }
 
-        public int onJoin(InetAddress endpoint, EndpointState epState) { return 0; }
-        public int onChange(InetAddress endpoint, ApplicationState state, VersionedValue value) { return 0; }
+        public void onJoin(InetAddress endpoint, EndpointState epState) {}
+        public void onChange(InetAddress endpoint, ApplicationState state, VersionedValue value) {}
         public void onAlive(InetAddress endpoint, EndpointState state) {}
         public void onDead(InetAddress endpoint, EndpointState state) {}
 

@@ -31,7 +31,7 @@ import org.apache.cassandra.streaming.IncomingStreamReader;
 import org.apache.cassandra.streaming.StreamHeader;
 import org.xerial.snappy.SnappyInputStream;
 
-import edu.uchicago.cs.ucare.util.Klogger;
+import edu.uchicago.cs.ucare.outdated.WorstCaseGossiperStub;
 
 public class IncomingTcpConnection extends Thread
 {
@@ -75,12 +75,14 @@ public class IncomingTcpConnection extends Thread
             int version = MessagingService.getBits(header, 15, 8);
             logger.debug("Connection version {} from {}", version, socket.getInetAddress());
 
-            if (isStream)
+            if (isStream) {
                 handleStream(in, version);
-            else if (version < MessagingService.VERSION_12)
+            } else if (version < MessagingService.VERSION_12) {
                 handleLegacyVersion(version);
-            else
+            } else {
+            	//Korn: for gossiper (and maybe other protocol) it falls on this case
                 handleModernVersion(version, header);
+            }
         }
         catch (EOFException e)
         {
@@ -106,7 +108,6 @@ public class IncomingTcpConnection extends Thread
         DataInputStream in = new DataInputStream(socket.getInputStream());
         int maxVersion = in.readInt();
         from = CompactEndpointSerializationHelper.deserialize(in);
-        Klogger.logger.info("Receiving connection from " + from);
         boolean compressed = MessagingService.getBits(header, 2, 1) == 1;
 
         if (compressed)
@@ -202,15 +203,13 @@ public class IncomingTcpConnection extends Thread
                 timestamp = (timestamp & 0xFFFFFFFF00000000L) | (((partial & 0xFFFFFFFFL) << 2) >> 2);
         }
 
-        long s = System.currentTimeMillis();
         MessageIn message = MessageIn.read(input, version, id);
-        long t = System.currentTimeMillis() - s;
-//        Klogger.logger.info("Reading a message from " + from + " took " + t + " ms");
         if (message == null)
         {
             // callback expired; nothing to do
             return null;
         }
+        message.setTo(socket.getLocalAddress());
         if (version <= MessagingService.current_version)
         {
             MessagingService.instance().receive(message, id, timestamp);

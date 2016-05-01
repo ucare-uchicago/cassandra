@@ -18,7 +18,6 @@
 package org.apache.cassandra.gms;
 
 import java.io.*;
-import java.net.InetAddress;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -26,9 +25,6 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.cliffc.high_scale_lib.NonBlockingHashMap;
-
-import edu.uchicago.cs.ucare.util.Klogger;
-import edu.uchicago.cs.ucare.util.StackTracePrinter;
 
 /**
  * This abstraction represents both the HeartBeatState and the ApplicationState in an EndpointState
@@ -48,23 +44,30 @@ public class EndpointState
     /* fields below do not get serialized */
     private volatile long updateTimestamp;
     private volatile boolean isAlive;
-    
+
     int hopNum;
 
-    EndpointState(HeartBeatState initialHbState)
+    public EndpointState(HeartBeatState initialHbState)
     {
         hbState = initialHbState;
         updateTimestamp = System.currentTimeMillis();
         isAlive = true;
         hopNum = 0;
     }
+    
+    public EndpointState(HeartBeatState initialHbState, long updateTimestamp, boolean isAlive)
+    {
+        hbState = initialHbState;
+        this.updateTimestamp = updateTimestamp;
+        this.isAlive = isAlive;
+    }
 
-    HeartBeatState getHeartBeatState()
+    public HeartBeatState getHeartBeatState()
     {
         return hbState;
     }
 
-    void setHeartBeatState(HeartBeatState newHbState)
+    public void setHeartBeatState(HeartBeatState newHbState)
     {
         updateTimestamp();
         hbState = newHbState;
@@ -92,20 +95,8 @@ public class EndpointState
         return applicationState;
     }
 
-    void addApplicationState(ApplicationState key, VersionedValue value)
+    public void addApplicationState(ApplicationState key, VersionedValue value)
     {
-//        StackTracePrinter.print(Klogger.logger);
-//        InetAddress thisAddress = null;
-//        for (InetAddress address : Gossiper.instance.endpointStateMap.keySet()) {
-//            if (this == Gossiper.instance.endpointStateMap.get(address)) {
-//                thisAddress = address;
-//            }
-//        }
-//        if (key == ApplicationState.TOKENS) {
-//            Klogger.logger.info(thisAddress + " add app state " + key);
-//        } else {
-//            Klogger.logger.info(thisAddress + " add app state " + key + " " + value);
-//        }
         applicationState.put(key, value);
     }
 
@@ -115,7 +106,7 @@ public class EndpointState
         return updateTimestamp;
     }
 
-    void updateTimestamp()
+    public void updateTimestamp()
     {
         updateTimestamp = System.currentTimeMillis();
     }
@@ -125,19 +116,14 @@ public class EndpointState
         return isAlive;
     }
 
-    void markAlive()
+    public void markAlive()
     {
         isAlive = true;
     }
 
-    void markDead()
+    public void markDead()
     {
         isAlive = false;
-    }
-
-    public String toString()
-    {
-        return "EndpointState: HeartBeatState = " + hbState + ", AppStateMap = " + applicationState;
     }
 
     @Override
@@ -173,9 +159,22 @@ public class EndpointState
             return false;
         if (isAlive != other.isAlive)
             return false;
-        if (updateTimestamp != other.updateTimestamp)
-            return false;
         return true;
+    }
+
+    public String toString()
+    {
+        return "EndpointState: HeartBeatState = " + hbState + ", AppStateMap = " + applicationState;
+    }
+    
+    public EndpointState copy() {
+        EndpointState clone = new EndpointState(hbState.copy(), updateTimestamp, isAlive);
+        for (ApplicationState state : applicationState.keySet()) {
+            VersionedValue vv = applicationState.get(state);
+            clone.applicationState.put(state, vv.copy());
+        }
+        clone.hopNum = hopNum;
+        return clone;
     }
 }
 
@@ -212,7 +211,7 @@ class EndpointStateSerializer implements IVersionedSerializer<EndpointState>
             epState.addApplicationState(Gossiper.STATES[key], value);
         }
         int hopNum = dis.readInt();
-        epState.setHopNum(hopNum);
+        epState.hopNum = hopNum;
         return epState;
     }
 

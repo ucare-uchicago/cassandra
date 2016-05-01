@@ -67,8 +67,8 @@ public class Memtable
      * called, all data up to the given context has been persisted to SSTables.
      */
     private static final ExecutorService flushWriter
-            = new JMXEnabledThreadPoolExecutor(DatabaseDescriptor.getFlushWriters(),
-                                               StageManager.KEEPALIVE,
+//            = new JMXEnabledThreadPoolExecutor(DatabaseDescriptor.getFlushWriters(),
+            = new JMXEnabledThreadPoolExecutor(16, StageManager.KEEPALIVE,
                                                TimeUnit.SECONDS,
                                                new LinkedBlockingQueue<Runnable>(DatabaseDescriptor.getFlushQueueSize()),
                                                new NamedThreadFactory("FlushWriter"),

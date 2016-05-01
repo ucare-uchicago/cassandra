@@ -28,9 +28,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.collect.*;
 
-import edu.uchicago.cs.ucare.util.Klogger;
-import edu.uchicago.cs.ucare.util.StackTracePrinter;
-
 import org.apache.cassandra.utils.BiMultiValMap;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.SortedBiMultiValMap;
@@ -49,6 +46,7 @@ public class TokenMetadata
 
     /* Maintains token to endpoint map of every node in the cluster. */
     public final BiMultiValMap<Token, InetAddress> tokenToEndpointMap;
+    public final Set<InetAddress> endpointWithTokens;
 
     /* Maintains endpoint to host ID map of every node in the cluster */
     private final BiMap<InetAddress, UUID> endpointToHostIdMap;
@@ -115,6 +113,7 @@ public class TokenMetadata
     private TokenMetadata(BiMultiValMap<Token, InetAddress> tokenToEndpointMap, BiMap<InetAddress, UUID> endpointsMap, Topology topology)
     {
         this.tokenToEndpointMap = tokenToEndpointMap;
+        endpointWithTokens = new HashSet<InetAddress>();
         this.topology = topology;
         endpointToHostIdMap = endpointsMap;
         sortedTokens = sortTokens();
@@ -193,6 +192,7 @@ public class TokenMetadata
                 for (Token token : tokens)
                 {
                     InetAddress prev = tokenToEndpointMap.put(token, endpoint);
+                    endpointWithTokens.add(endpoint);
                     if (!endpoint.equals(prev))
                     {
                         if (prev != null)
@@ -479,9 +479,9 @@ public class TokenMetadata
     
     // Added by Korn for debugging
     public int getTokenSize(InetAddress endpoint) {
-    	if (!isMember(endpoint)) {
-    		return 0;
-    	}
+        if (!isMember(endpoint)) {
+            return 0;
+        }
         lock.readLock().lock();
         try
         {
@@ -849,6 +849,7 @@ public class TokenMetadata
         try
         {
             Set<InetAddress> eps = tokenToEndpointMap.inverse().keySet();
+
             if (!eps.isEmpty())
             {
                 sb.append("Normal Tokens:");

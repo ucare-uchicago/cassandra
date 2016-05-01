@@ -45,7 +45,6 @@ public class GossipDigestAck
     final Map<InetAddress, EndpointState> epStateMap;
     final int msgId;
     final int syncId;
-    long createdTime;
 
     GossipDigestAck(List<GossipDigest> gDigestList, Map<InetAddress, EndpointState> epStateMap, int syncId)
     {
@@ -63,7 +62,7 @@ public class GossipDigestAck
         this.syncId = syncId;
     }
 
-    public List<GossipDigest> getGossipDigestList()
+    List<GossipDigest> getGossipDigestList()
     {
         return gDigestList;
     }
@@ -73,46 +72,43 @@ public class GossipDigestAck
         return epStateMap;
     }
 
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result
-                + ((epStateMap == null) ? 0 : epStateMap.hashCode());
-        result = prime * result
-                + ((gDigestList == null) ? 0 : gDigestList.hashCode());
-        return result;
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+				+ ((epStateMap == null) ? 0 : epStateMap.hashCode());
+		result = prime * result
+				+ ((gDigestList == null) ? 0 : gDigestList.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		GossipDigestAck other = (GossipDigestAck) obj;
+		if (epStateMap == null) {
+			if (other.epStateMap != null)
+				return false;
+		} else if (!epStateMap.equals(other.epStateMap))
+			return false;
+		if (gDigestList == null) {
+			if (other.gDigestList != null)
+				return false;
+		} else if (!gDigestList.equals(other.gDigestList))
+			return false;
+		return true;
+	}
+
+    public int getMsgId() {
+        return msgId;
     }
 
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        GossipDigestAck other = (GossipDigestAck) obj;
-        if (epStateMap == null) {
-            if (other.epStateMap != null)
-                return false;
-        } else if (!epStateMap.equals(other.epStateMap))
-            return false;
-        if (gDigestList == null) {
-            if (other.gDigestList != null)
-                return false;
-        } else if (!gDigestList.equals(other.gDigestList))
-            return false;
-        return true;
-    }
-
-    public long getCreatedTime() {
-        return createdTime;
-    }
-
-    public void setCreatedTime(long createdTime) {
-        this.createdTime = createdTime;
-    }
 }
 
 class GossipDigestAckSerializer implements IVersionedSerializer<GossipDigestAck>
@@ -131,7 +127,6 @@ class GossipDigestAckSerializer implements IVersionedSerializer<GossipDigestAck>
         }
         dos.writeInt(gDigestAckMessage.msgId);
         dos.writeInt(gDigestAckMessage.syncId);
-        dos.writeLong(gDigestAckMessage.createdTime);
     }
 
     public GossipDigestAck deserialize(DataInput dis, int version) throws IOException
@@ -150,10 +145,8 @@ class GossipDigestAckSerializer implements IVersionedSerializer<GossipDigestAck>
         }
         int msgId = dis.readInt();
         int syncId = dis.readInt();
-        long createdTime = dis.readLong();
-        GossipDigestAck digest = new GossipDigestAck(gDigestList, epStateMap, msgId, syncId);
-        digest.setCreatedTime(createdTime);
-        return digest;
+        GossipDigestAck ack = new GossipDigestAck(gDigestList, epStateMap, msgId, syncId);
+        return ack;
     }
 
     public long serializedSize(GossipDigestAck ack, int version)
