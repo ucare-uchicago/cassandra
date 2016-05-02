@@ -24,6 +24,7 @@ import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.cassandra.exceptions.ConfigurationException;
+import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.Pair;
@@ -123,6 +124,86 @@ public class NetworkTopologyStrategy extends AbstractReplicationStrategy
             if (logger.isDebugEnabled())
                 logger.debug("{} endpoints in datacenter {} for token {} ",
                              new Object[] { StringUtils.join(dcEndpoints, ","), dcName, searchToken});
+            endpoints.addAll(dcEndpoints);
+        }
+
+        return endpoints;
+    }
+    
+    // jef copy of getAddressRanges in AbstractReplicationStrategy.java
+    public static Multimap<InetAddress, Range<Token>> getAddressRanges2(TokenMetadata metadata)
+    {
+        Multimap<InetAddress, Range<Token>> map = HashMultimap.create();
+
+        for (Token token : metadata.sortedTokens())
+        {
+            Range<Token> range = metadata.getPrimaryRangeFor(token);
+            for (InetAddress ep : calculateNaturalEndpoints2(token, metadata))
+            {
+                map.put(ep, range);
+            }
+        }
+
+        return map;
+    }
+
+    
+    // jef : copy of calculateNaturalEndpoints
+    public static List<InetAddress> calculateNaturalEndpoints2(Token searchToken, TokenMetadata tokenMetadata)
+    {
+        List<InetAddress> endpoints = new ArrayList<InetAddress>(1);
+
+        Map<String, Integer> datacenters = new HashMap<String, Integer>();
+        datacenters.put("DC1", 1);
+        IEndpointSnitch snitch = new SimpleSnitch();
+        
+        for (Entry<String, Integer> dcEntry : datacenters.entrySet())
+        {
+            String dcName = dcEntry.getKey();
+            int dcReplicas = dcEntry.getValue();
+
+            // collect endpoints in this DC; add in bulk to token meta data for computational complexity
+            // reasons (CASSANDRA-3831).
+            //Set<Pair<Token, InetAddress>> dcTokensToUpdate = new HashSet<Pair<Token, InetAddress>>();
+            Multimap<InetAddress, Token>  dcTokensToUpdate = HashMultimap.create();
+            for (Entry<Token, InetAddress> tokenEntry : tokenMetadata.getTokenToEndpointMapForReading().entrySet())
+            {
+                if (snitch.getDatacenter(tokenEntry.getValue()).equals(dcName))
+                    //dcTokensToUpdate.add(Pair.create(tokenEntry.getKey(), tokenEntry.getValue()));
+                    dcTokensToUpdate.put(tokenEntry.getValue(), tokenEntry.getKey());
+            }
+            TokenMetadata dcTokens = new TokenMetadata();
+            dcTokens.updateNormalTokens(dcTokensToUpdate);
+
+            List<InetAddress> dcEndpoints = new ArrayList<InetAddress>(dcReplicas);
+            Set<String> racks = new HashSet<String>();
+            // first pass: only collect replicas on unique racks
+            for (Iterator<Token> iter = TokenMetadata.ringIterator(dcTokens.sortedTokens(), searchToken, false);
+                 dcEndpoints.size() < dcReplicas && iter.hasNext(); )
+            {
+                Token token = iter.next();
+                InetAddress endpoint = dcTokens.getEndpoint(token);
+                String rack = snitch.getRack(endpoint);
+                if (!racks.contains(rack))
+                {
+                    dcEndpoints.add(endpoint);
+                    racks.add(rack);
+                }
+            }
+
+            // second pass: if replica count has not been achieved from unique racks, add nodes from duplicate racks
+            for (Iterator<Token> iter = TokenMetadata.ringIterator(dcTokens.sortedTokens(), searchToken, false);
+                 dcEndpoints.size() < dcReplicas && iter.hasNext(); )
+            {
+                Token token = iter.next();
+                InetAddress endpoint = dcTokens.getEndpoint(token);
+                if (!dcEndpoints.contains(endpoint))
+                    dcEndpoints.add(endpoint);
+            }
+
+//            if (logger.isDebugEnabled())
+//                logger.debug("{} endpoints in datacenter {} for token {} ",
+//                             new Object[] { StringUtils.join(dcEndpoints, ","), dcName, searchToken});
             endpoints.addAll(dcEndpoints);
         }
 
