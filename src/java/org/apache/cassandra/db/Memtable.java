@@ -70,7 +70,8 @@ public class Memtable
 //            = new JMXEnabledThreadPoolExecutor(DatabaseDescriptor.getFlushWriters(),
             = new JMXEnabledThreadPoolExecutor(16, StageManager.KEEPALIVE,
                                                TimeUnit.SECONDS,
-                                               new LinkedBlockingQueue<Runnable>(DatabaseDescriptor.getFlushQueueSize()),
+//                                               new LinkedBlockingQueue<Runnable>(DatabaseDescriptor.getFlushQueueSize()),
+                                               new LinkedBlockingQueue<Runnable>(),
                                                new NamedThreadFactory("FlushWriter"),
                                                "internal");
 

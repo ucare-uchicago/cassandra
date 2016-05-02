@@ -18,10 +18,13 @@
 package org.apache.cassandra.gms;
 
 import java.net.InetAddress;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.net.MessageIn;
 
@@ -48,5 +51,24 @@ public class SimulatedGossipDigestAck2VerbHandler implements IVerbHandler<Gossip
         Gossiper.notifyFailureDetectorStatic(receiverStub, receiverStub.getEndpointStateMap(), remoteEpStateMap, receiverStub.getFailureDetector());
         Gossiper.applyStateLocallyStatic(receiverStub, remoteEpStateMap);
         WholeClusterSimulator.isProcessing.get(to).set(false);
+
+        long doneTime = System.currentTimeMillis();
+        logIt(receiverStub, message, receiveTime, doneTime);
+    }
+
+    private Set<Map.Entry<Token, InetAddress>> prevMap = new HashSet<Map.Entry<Token, InetAddress>>();
+
+    private void logIt(GossiperStub receiverStub, MessageIn message, long receiveTime, long doneTime){
+      int tokenToEndpointMapHash = receiverStub.getTokenMetadata().tokenToEndpointMap.hashCode();
+      Set<Map.Entry<Token, InetAddress>> currMap = receiverStub.getTokenMetadata().tokenToEndpointMap.entrySet();
+
+      String logMsg = "receivedMessage: " + message.hashCode() + " from " + message.from
+          + " recTime: " + receiveTime + " doneTime: " + doneTime + " elapsedTime: " + (doneTime-receiveTime)
+          + " STATE_BEGIN: tokenToEndpointMap: " + tokenToEndpointMapHash;
+      if (!currMap.equals(prevMap)){
+        logMsg += " STATE_END tokenMetadata: " + receiverStub.getTokenMetadata().tokenToEndpointMap.entrySet().toString();
+        prevMap = new HashSet<Map.Entry<Token, InetAddress>>(currMap);
+      }
+      logger.info(logMsg);
     }
 }

@@ -125,7 +125,7 @@ public class Config
     public CommitLogSync commitlog_sync;
     public Double commitlog_sync_batch_window_in_ms;
     public Integer commitlog_sync_period_in_ms;
-    public int commitlog_segment_size_in_mb = 32;
+    public int commitlog_segment_size_in_mb = 512;
 
     public String endpoint_snitch;
     public Boolean dynamic_snitch = true;

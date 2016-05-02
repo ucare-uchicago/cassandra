@@ -56,6 +56,7 @@ public class WholeClusterSimulator {
     public static ScheduledExecutorService resumeProcessors;
     public static Map<InetAddress, AtomicBoolean> isProcessing;
     public static Map<InetAddress, Boolean> isStarted = new HashMap<InetAddress, Boolean>();
+    public static Map<InetAddress, Integer> processCount = new HashMap<InetAddress, Integer>();
     
     static
     {
@@ -128,11 +129,12 @@ public class WholeClusterSimulator {
             msgQueues.put(address, new ConcurrentLinkedQueue<MessageIn<?>>());
             isProcessing.put(address, new AtomicBoolean(false));
             isStarted.put(address, false);
+            processCount.put(address, 0);
         }
         logger.info("Simulate " + numStubs + " nodes = " + addressList);
 
         stubGroup = stubGroupBuilder.setClusterId("Test Cluster").setDataCenter("")
-                .setNumTokens(1024).setSeeds(seeds).setAddressList(addressList)
+                .setNumTokens(32).setSeeds(seeds).setAddressList(addressList)
                 .setPartitioner(new Murmur3Partitioner()).build();
         stubGroup.prepareInitialState();
 
@@ -203,11 +205,11 @@ public class WholeClusterSimulator {
                             }
                         }, 10000);
                     }
-                    try {
-                        Thread.sleep(50);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+//                    try {
+//                        Thread.sleep(50);
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                    }
                 }
             }
         });
@@ -223,6 +225,16 @@ public class WholeClusterSimulator {
         return msgIn;
     }
     
+    public static boolean sendMessage(MessageIn<?> message) {
+        InetAddress sender = message.from;
+        InetAddress receiver = message.to;
+        GossiperStub senderStub = stubGroup.getStub(sender);
+        GossiperStub receiverStub = stubGroup.getStub(receiver);
+        logger.info("sendMessage: " + message.hashCode() + " to " + receiver
+            + " senderTokenToEndpointMap: " + senderStub.getTokenMetadata().tokenToEndpointMap.hashCode());
+        return msgQueues.get(receiver).add(message);
+    }
+
     static Random rand = new Random();
     
     public static class MyGossiperTask extends TimerTask {
@@ -249,8 +261,7 @@ public class WholeClusterSimulator {
                     InetAddress liveReceiver = GossiperStub.getRandomAddress(liveEndpoints);
                     gossipToSeed = seeds.contains(liveReceiver);
                     MessageIn<GossipDigestSyn> synMsg = performer.genGossipDigestSyncMsgIn(liveReceiver);
-                    ConcurrentLinkedQueue<MessageIn<?>> msgQueue = msgQueues.get(liveReceiver);
-                    if (!msgQueue.add(synMsg)) {
+                    if (!WholeClusterSimulator.sendMessage(synMsg)) {
                         logger.error("Cannot add more message to message queue");
                     } else {
 //                        logger.debug(performerAddress + " sending sync to " + liveReceiver + " " + synMsg.payload.gDigests);
@@ -264,8 +275,7 @@ public class WholeClusterSimulator {
                     MessageIn<GossipDigestSyn> synMsg = performer.genGossipDigestSyncMsgIn(unreachableReceiver);
                     double prob = ((double) unreachableEndpoints.size()) / (liveEndpoints.size() + 1.0);
                     if (prob > random.nextDouble()) {
-                        ConcurrentLinkedQueue<MessageIn<?>> msgQueue = msgQueues.get(unreachableReceiver);
-                        if (!msgQueue.add(synMsg)) {
+                        if (!WholeClusterSimulator.sendMessage(synMsg)) {
                             logger.error("Cannot add more message to message queue");
                         } else {
                         }
@@ -280,8 +290,7 @@ public class WholeClusterSimulator {
                             if (liveEndpoints.size() == 0) {
                                 InetAddress seed = GossiperStub.getRandomAddress(seeds);
                                 MessageIn<GossipDigestSyn> synMsg = performer.genGossipDigestSyncMsgIn(seed);
-                                ConcurrentLinkedQueue<MessageIn<?>> msgQueue = msgQueues.get(seed);
-                                if (!msgQueue.add(synMsg)) {
+                                if (!WholeClusterSimulator.sendMessage(synMsg)) {
                                     logger.error("Cannot add more message to message queue");
                                 } else {
 //                                    logger.debug(performerAddress + " sending sync to seed " + seed + " " + synMsg.payload.gDigests);
@@ -292,8 +301,7 @@ public class WholeClusterSimulator {
                                 if (randDbl <= probability) {
                                     InetAddress seed = GossiperStub.getRandomAddress(seeds);
                                     MessageIn<GossipDigestSyn> synMsg = performer.genGossipDigestSyncMsgIn(seed);
-                                    ConcurrentLinkedQueue<MessageIn<?>> msgQueue = msgQueues.get(seed);
-                                    if (!msgQueue.add(synMsg)) {
+                                    if (!WholeClusterSimulator.sendMessage(synMsg)) {
                                         logger.error("Cannot add more message to message queue");
                                     } else {
 //                                        logger.debug(performerAddress + " sending sync to seed " + seed + " " + synMsg.payload.gDigests);
@@ -389,7 +397,6 @@ public class WholeClusterSimulator {
                 int sentCount = 0;
                 interval = sentCount == 0 ? 0 : interval / sentCount;
                 long avgNetworkQueuedTime = MessageProcessor.processCount == 0 ? 0 : MessageProcessor.networkQueuedTime / MessageProcessor.processCount;
-//                System.out.println(ResumeTask.totalRealSleepTime + " " + ResumeTask.totalExpectedSleepTime);
                 if (isStable) {
                     logger.info("stable status yes " + flapping + " ; send lateness " + interval +
                             " ; network lateness " + avgNetworkQueuedTime);
@@ -397,16 +404,24 @@ public class WholeClusterSimulator {
                     logger.info("stable status no " + flapping + " " + " ; send lateness " + interval + 
                             " ; network lateness " + avgNetworkQueuedTime);
                 }
-                for (InetAddress address : msgQueues.keySet()) {
-                    ConcurrentLinkedQueue<MessageIn<?>> msgQueue = msgQueues.get(address);
-                    int queueSize = msgQueue.size();
-                    if (queueSize > 100) {
-                        logger.info("Backlog of " + address + " " + queueSize);
+//                for (InetAddress address : msgQueues.keySet()) {
+//                    ConcurrentLinkedQueue<MessageIn<?>> msgQueue = msgQueues.get(address);
+//                    int queueSize = msgQueue.size();
+//                    if (queueSize > 100) {
+//                        logger.info("Backlog of " + address + " " + queueSize);
+//                    }
+//                }
+                boolean enough = true;
+                for (InetAddress address : processCount.keySet()) {
+                    if (processCount.get(address) < 180) {
+                        enough = false;
                     }
                 }
-                
+                if (enough) {
+                    System.exit(0);
+                }
                 try {
-                    Thread.sleep(2000);
+                    Thread.sleep(5000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }

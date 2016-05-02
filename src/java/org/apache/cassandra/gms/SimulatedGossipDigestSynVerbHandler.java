@@ -23,6 +23,7 @@ import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.net.MessageIn;
 import org.apache.cassandra.net.MessagingService;
@@ -42,6 +43,7 @@ public class SimulatedGossipDigestSynVerbHandler implements IVerbHandler<GossipD
         InetAddress to = message.to;
         GossiperStub senderStub = WholeClusterSimulator.stubGroup.getStub(from);
         GossiperStub receiverStub = WholeClusterSimulator.stubGroup.getStub(to);
+
         GossipDigestSyn gDigestMessage = message.payload;
         /* If the message is from a different cluster throw it away. */
         if (!gDigestMessage.clusterId.equals(DatabaseDescriptor.getClusterName())) {
@@ -77,9 +79,31 @@ public class SimulatedGossipDigestSynVerbHandler implements IVerbHandler<GossipD
         // TODO Can I comment this out?
         Gossiper.instance.checkSeedContact(from);
         gDigestAckMessage.createdTime = System.currentTimeMillis();
-        WholeClusterSimulator.msgQueues.get(from).add(gDigestAckMessage);
+        WholeClusterSimulator.sendMessage(gDigestAckMessage);
+//        WholeClusterSimulator.msgQueues.get(from).add(gDigestAckMessage);
 //        WholeClusterSimulator.msgQueue.add(gDigestAckMessage);
+        int count = WholeClusterSimulator.processCount.get(to);
+        WholeClusterSimulator.processCount.put(to, count + 1);
         WholeClusterSimulator.isProcessing.get(to).set(false);
+
+        long doneTime = System.currentTimeMillis();
+        logIt(receiverStub, message, receiveTime, doneTime);
+    }
+
+    private Set<Map.Entry<Token, InetAddress>> prevMap = new HashSet<Map.Entry<Token, InetAddress>>();
+
+    private void logIt(GossiperStub receiverStub, MessageIn message, long receiveTime, long doneTime){
+      int tokenToEndpointMapHash = receiverStub.getTokenMetadata().tokenToEndpointMap.hashCode();
+      Set<Map.Entry<Token, InetAddress>> currMap = receiverStub.getTokenMetadata().tokenToEndpointMap.entrySet();
+
+      String logMsg = "receivedMessage: " + message.hashCode() + " from " + message.from
+          + " recTime: " + receiveTime + " doneTime: " + doneTime + " elapsedTime: " + (doneTime-receiveTime)
+          + " STATE_BEGIN: tokenToEndpointMap: " + tokenToEndpointMapHash;
+      if (!currMap.equals(prevMap)){
+        logMsg += " STATE_END tokenMetadata: " + receiverStub.getTokenMetadata().tokenToEndpointMap.entrySet().toString();
+        prevMap = new HashSet<Map.Entry<Token, InetAddress>>(currMap);
+      }
+      logger.info(logMsg);
     }
 
     /*

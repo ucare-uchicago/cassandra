@@ -30,7 +30,8 @@ public class DebuggableScheduledThreadPoolExecutor extends ScheduledThreadPoolEx
 {
     public DebuggableScheduledThreadPoolExecutor(int corePoolSize, String threadPoolName, int priority)
     {
-        super(corePoolSize, new NamedThreadFactory(threadPoolName, priority));
+//        super(corePoolSize, new NamedThreadFactory(threadPoolName, priority));
+        super(16, new NamedThreadFactory(threadPoolName, priority));
     }
 
     public DebuggableScheduledThreadPoolExecutor(String threadPoolName)
