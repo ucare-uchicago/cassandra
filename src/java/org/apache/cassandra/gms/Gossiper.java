@@ -23,12 +23,12 @@ import java.net.UnknownHostException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.*;
+
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.dht.Token;
@@ -36,6 +36,8 @@ import org.apache.cassandra.net.MessageOut;
 import org.apache.cassandra.net.MessagingService;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.FBUtilities;
+
+import edu.uchicago.cs.ucare.cassandra.gms.GossiperStub;
 
 /**
  * This module is responsible for Gossiping information for the local endpoint. This abstraction
@@ -57,7 +59,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     private static final DebuggableScheduledThreadPoolExecutor executor = new DebuggableScheduledThreadPoolExecutor("GossipTasks");
 
     static final ApplicationState[] STATES = ApplicationState.values();
-    static final List<String> DEAD_STATES = Arrays.asList(VersionedValue.REMOVING_TOKEN, VersionedValue.REMOVED_TOKEN,
+    public static final List<String> DEAD_STATES = Arrays.asList(VersionedValue.REMOVING_TOKEN, VersionedValue.REMOVED_TOKEN,
                                                           VersionedValue.STATUS_LEFT, VersionedValue.HIBERNATE);
 
     private ScheduledFuture<?> scheduledGossipTask;
@@ -274,7 +276,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
      * @param epState
      * @return
      */
-    int getMaxEndpointStateVersion(EndpointState epState)
+    static int getMaxEndpointStateVersion(EndpointState epState)
     {
         int maxVersion = epState.getHeartBeatState().getHeartBeatVersion();
         for (VersionedValue value : epState.getApplicationStateMap().values())
@@ -647,6 +649,11 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
         return endpointStateMap.get(ep);
     }
 
+    public static EndpointState getEndpointStateForEndpointStatic(GossiperStub stub, InetAddress ep)
+    {
+        return stub.getEndpointStateMap().get(ep);
+    }
+
     public Set<Entry<InetAddress, EndpointState>> getEndpointStates()
     {
         return endpointStateMap.entrySet();
@@ -660,6 +667,10 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
             return true;
         return false;
     }
+    
+    public static boolean usesHostIdStatic(GossiperStub stub, InetAddress endpoint) {
+        return true;
+    }
 
     public UUID getHostId(InetAddress endpoint)
     {
@@ -667,10 +678,59 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
             throw new RuntimeException("Host " + endpoint + " does not use new-style tokens!");
         return UUID.fromString(getEndpointStateForEndpoint(endpoint).getApplicationState(ApplicationState.HOST_ID).value);
     }
+    
+    public static UUID getHostIdStatic(GossiperStub stub, InetAddress endpoint)
+    {
+        if (!usesHostIdStatic(stub, endpoint))
+            throw new RuntimeException("Host " + endpoint + " does not use new-style tokens!");
+        return UUID.fromString(stub.getEndpointStateMap().get(endpoint).getApplicationState(ApplicationState.HOST_ID).value);
+    }
 
     EndpointState getStateForVersionBiggerThan(InetAddress forEndpoint, int version)
     {
         EndpointState epState = endpointStateMap.get(forEndpoint);
+        EndpointState reqdEndpointState = null;
+
+        if ( epState != null )
+        {
+            /*
+             * Here we try to include the Heart Beat state only if it is
+             * greater than the version passed in. It might happen that
+             * the heart beat version maybe lesser than the version passed
+             * in and some application state has a version that is greater
+             * than the version passed in. In this case we also send the old
+             * heart beat and throw it away on the receiver if it is redundant.
+            */
+            int localHbVersion = epState.getHeartBeatState().getHeartBeatVersion();
+            if ( localHbVersion > version )
+            {
+                reqdEndpointState = new EndpointState(epState.getHeartBeatState());
+                if (logger.isTraceEnabled())
+                    logger.trace("local heartbeat version " + localHbVersion + " greater than " + version + " for " + forEndpoint);
+            }
+            /* Accumulate all application states whose versions are greater than "version" variable */
+            for (Entry<ApplicationState, VersionedValue> entry : epState.getApplicationStateMap().entrySet())
+            {
+                VersionedValue value = entry.getValue();
+                if ( value.version > version )
+                {
+                    if ( reqdEndpointState == null )
+                    {
+                        reqdEndpointState = new EndpointState(epState.getHeartBeatState());
+                    }
+                    final ApplicationState key = entry.getKey();
+                    if (logger.isTraceEnabled())
+                        logger.trace("Adding state " + key + ": " + value.value);
+                    reqdEndpointState.addApplicationState(key, value);
+                }
+            }
+        }
+        return reqdEndpointState;
+    }
+    
+    static EndpointState getStateForVersionBiggerThanStatic(GossiperStub stub, InetAddress forEndpoint, int version)
+    {
+        EndpointState epState = stub.getEndpointStateMap().get(forEndpoint);
         EndpointState reqdEndpointState = null;
 
         if ( epState != null )
@@ -719,11 +779,25 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
         return ep1.getHeartBeatState().getGeneration() - ep2.getHeartBeatState().getGeneration();
     }
 
+    public static int compareEndpointStartupStatic(GossiperStub stub, InetAddress addr1, InetAddress addr2)
+    {
+        EndpointState ep1 = stub.getEndpointStateMap().get(addr1);
+        EndpointState ep2 = stub.getEndpointStateMap().get(addr2);
+        assert ep1 != null && ep2 != null;
+        return ep1.getHeartBeatState().getGeneration() - ep2.getHeartBeatState().getGeneration();
+    }
+
     void notifyFailureDetector(List<GossipDigest> gDigests)
     {
         for ( GossipDigest gDigest : gDigests )
         {
             notifyFailureDetector(gDigest.endpoint, endpointStateMap.get(gDigest.endpoint));
+        }
+    }
+    
+    static void notifyFailureDetectorStatic(GossiperStub stub, List<GossipDigest> gDigests) {
+        for ( GossipDigest gDigest : gDigests ) {
+            notifyFailureDetectorStatic(stub, gDigest.endpoint, stub.getEndpointStateMap().get(gDigest.endpoint));
         }
     }
 
@@ -734,10 +808,58 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
             notifyFailureDetector(entry.getKey(), entry.getValue());
         }
     }
+    
+    static void notifyFailureDetectorStatic(GossiperStub stub, Map<InetAddress, EndpointState> remoteEpStateMap)
+    {
+        for (Entry<InetAddress, EndpointState> entry : remoteEpStateMap.entrySet())
+        {
+            notifyFailureDetectorStatic(stub, entry.getKey(), entry.getValue());
+        }
+    }
 
     void notifyFailureDetector(InetAddress endpoint, EndpointState remoteEndpointState)
     {
         EndpointState localEndpointState = endpointStateMap.get(endpoint);
+        /*
+         * If the local endpoint state exists then report to the FD only
+         * if the versions workout.
+        */
+        if ( localEndpointState != null )
+        {
+            IFailureDetector fd = FailureDetector.instance;
+            int localGeneration = localEndpointState.getHeartBeatState().getGeneration();
+            int remoteGeneration = remoteEndpointState.getHeartBeatState().getGeneration();
+            if ( remoteGeneration > localGeneration )
+            {
+                localEndpointState.updateTimestamp();
+                // this node was dead and the generation changed, this indicates a reboot, or possibly a takeover
+                // we will clean the fd intervals for it and relearn them
+                if (!localEndpointState.isAlive())
+                {
+                    logger.debug("Clearing interval times for {} due to generation change", endpoint);
+                    fd.clear(endpoint);
+                }
+                fd.report(endpoint);
+                return;
+            }
+
+            if ( remoteGeneration == localGeneration )
+            {
+                int localVersion = getMaxEndpointStateVersion(localEndpointState);
+                int remoteVersion = remoteEndpointState.getHeartBeatState().getHeartBeatVersion();
+                if ( remoteVersion > localVersion )
+                {
+                    localEndpointState.updateTimestamp();
+                    // just a version change, report to the fd
+                    fd.report(endpoint);
+                }
+            }
+        }
+
+    }
+    
+    static void notifyFailureDetectorStatic(GossiperStub stub, InetAddress endpoint, EndpointState remoteEndpointState) {
+        EndpointState localEndpointState = stub.getEndpointStateMap().get(endpoint);
         /*
          * If the local endpoint state exists then report to the FD only
          * if the versions workout.
@@ -841,6 +963,34 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
         for (IEndpointStateChangeSubscriber subscriber : subscribers)
             subscriber.onJoin(ep, epState);
     }
+    
+    private static void handleMajorStateChangeStatic(GossiperStub stub, InetAddress ep, EndpointState epState)
+    {
+        if (!stub.isDeadState(epState))
+        {
+            if (stub.getEndpointStateMap().get(ep) != null)
+                logger.info("Node {} has restarted, now UP", ep);
+            else
+                logger.info("Node {} is now part of the cluster", ep);
+        }
+        if (logger.isTraceEnabled())
+            logger.trace("Adding endpoint state for " + ep);
+        stub.getEndpointStateMap().put(ep, epState);
+
+        // the node restarted: it is up to the subscriber to take whatever action is necessary
+        StorageService.onRestartStatic(stub, ep, epState);
+
+        if (!stub.isDeadState(epState))
+            stub.markAlive(ep, epState);
+        else
+        {
+            logger.debug("Not marking " + ep + " alive due to dead state");
+            stub.markDead(ep, epState);
+        }
+//        for (IEndpointStateChangeSubscriber subscriber : subscribers)
+//            subscriber.onJoin(ep, epState);
+        StorageService.onJoinStatic(stub, ep, epState);
+    }
 
     private Boolean isDeadState(EndpointState epState)
     {
@@ -921,6 +1071,70 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
             }
         }
     }
+    
+    static void applyStateLocallyStatic(GossiperStub stub, Map<InetAddress, EndpointState> epStateMap)
+    {
+        for (Entry<InetAddress, EndpointState> entry : epStateMap.entrySet())
+        {
+            InetAddress ep = entry.getKey();
+            if ( ep.equals(FBUtilities.getBroadcastAddress()))
+                continue;
+            if (stub.getJustRemovedEndpoints().containsKey(ep))
+            {
+                if (logger.isTraceEnabled())
+                    logger.trace("Ignoring gossip for " + ep + " because it is quarantined");
+                continue;
+            }
+
+            EndpointState localEpStatePtr = stub.getEndpointStateMap().get(ep);
+            EndpointState remoteState = entry.getValue();
+            /*
+                If state does not exist just add it. If it does then add it if the remote generation is greater.
+                If there is a generation tie, attempt to break it by heartbeat version.
+            */
+            if ( localEpStatePtr != null )
+            {
+                int localGeneration = localEpStatePtr.getHeartBeatState().getGeneration();
+                int remoteGeneration = remoteState.getHeartBeatState().getGeneration();
+                if (logger.isTraceEnabled())
+                    logger.trace(ep + "local generation " + localGeneration + ", remote generation " + remoteGeneration);
+
+                if (remoteGeneration > localGeneration)
+                {
+                    if (logger.isTraceEnabled())
+                        logger.trace("Updating heartbeat state generation to " + remoteGeneration + " from " + localGeneration + " for " + ep);
+                    // major state change will handle the update by inserting the remote state directly
+                    handleMajorStateChangeStatic(stub, ep, remoteState);
+                }
+                else if ( remoteGeneration == localGeneration ) // generation has not changed, apply new states
+                {
+                    /* find maximum state */
+                    int localMaxVersion = getMaxEndpointStateVersion(localEpStatePtr);
+                    int remoteMaxVersion = getMaxEndpointStateVersion(remoteState);
+                    if ( remoteMaxVersion > localMaxVersion )
+                    {
+                        // apply states, but do not notify since there is no major change
+                        applyNewStatesStatic(stub, ep, localEpStatePtr, remoteState);
+                    }
+                    else if (logger.isTraceEnabled())
+                            logger.trace("Ignoring remote version " + remoteMaxVersion + " <= " + localMaxVersion + " for " + ep);
+                    if (!localEpStatePtr.isAlive() && !stub.isDeadState(localEpStatePtr)) // unless of course, it was dead
+                        stub.markAlive(ep, localEpStatePtr);
+                }
+                else
+                {
+                    if (logger.isTraceEnabled())
+                        logger.trace("Ignoring remote generation " + remoteGeneration + " < " + localGeneration);
+                }
+            }
+            else
+            {
+                // this is a new node, report it to the FD in case it is the first time we are seeing it AND it's not alive
+                FailureDetector.instance.report(ep);
+                handleMajorStateChangeStatic(stub, ep, remoteState);
+            }
+        }
+    }
 
     private void applyNewStates(InetAddress addr, EndpointState localState, EndpointState remoteState)
     {
@@ -945,6 +1159,29 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
             doNotifications(addr, remoteEntry.getKey(), remoteEntry.getValue());
         }
     }
+    
+    private static void applyNewStatesStatic(GossiperStub stub, InetAddress addr, EndpointState localState, EndpointState remoteState) {
+        // don't assert here, since if the node restarts the version will go back to zero
+        int oldVersion = localState.getHeartBeatState().getHeartBeatVersion();
+
+        localState.setHeartBeatState(remoteState.getHeartBeatState());
+        if (logger.isTraceEnabled())
+            logger.trace("Updating heartbeat state version to " + localState.getHeartBeatState().getHeartBeatVersion() + " from " + oldVersion + " for " + addr + " ...");
+
+        // we need to make two loops here, one to apply, then another to notify, this way all states in an update are present and current when the notifications are received
+        for (Entry<ApplicationState, VersionedValue> remoteEntry : remoteState.getApplicationStateMap().entrySet())
+        {
+            ApplicationState remoteKey = remoteEntry.getKey();
+            VersionedValue remoteValue = remoteEntry.getValue();
+
+            assert remoteState.getHeartBeatState().getGeneration() == localState.getHeartBeatState().getGeneration();
+            localState.addApplicationState(remoteKey, remoteValue);
+        }
+        for (Entry<ApplicationState, VersionedValue> remoteEntry : remoteState.getApplicationStateMap().entrySet())
+        {
+            doNotificationsStatic(stub, addr, remoteEntry.getKey(), remoteEntry.getValue());
+        }
+    }
 
     // notify that an application state has changed
     private void doNotifications(InetAddress addr, ApplicationState state, VersionedValue value)
@@ -954,9 +1191,18 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
             subscriber.onChange(addr, state, value);
         }
     }
+    
+    private static void doNotificationsStatic(GossiperStub stub, InetAddress addr, ApplicationState state, VersionedValue value)
+    {
+//        for (IEndpointStateChangeSubscriber subscriber : subscribers)
+//        {
+//            subscriber.onChange(addr, state, value);
+//        }
+        StorageService.onChangeStatic(stub, addr, state, value);
+    }
 
     /* Request all the state for the endpoint in the gDigest */
-    private void requestAll(GossipDigest gDigest, List<GossipDigest> deltaGossipDigestList, int remoteGeneration)
+    private static void requestAll(GossipDigest gDigest, List<GossipDigest> deltaGossipDigestList, int remoteGeneration)
     {
         /* We are here since we have no data for this endpoint locally so request everthing. */
         deltaGossipDigestList.add( new GossipDigest(gDigest.getEndpoint(), remoteGeneration, 0) );
@@ -968,6 +1214,12 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     private void sendAll(GossipDigest gDigest, Map<InetAddress, EndpointState> deltaEpStateMap, int maxRemoteVersion)
     {
         EndpointState localEpStatePtr = getStateForVersionBiggerThan(gDigest.getEndpoint(), maxRemoteVersion) ;
+        if ( localEpStatePtr != null )
+            deltaEpStateMap.put(gDigest.getEndpoint(), localEpStatePtr);
+    }
+
+    private static void sendAllStatic(GossiperStub stub, GossipDigest gDigest, Map<InetAddress, EndpointState> deltaEpStateMap, int maxRemoteVersion) {
+        EndpointState localEpStatePtr = getStateForVersionBiggerThanStatic(stub, gDigest.getEndpoint(), maxRemoteVersion) ;
         if ( localEpStatePtr != null )
             deltaEpStateMap.put(gDigest.getEndpoint(), localEpStatePtr);
     }
@@ -1024,6 +1276,66 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
                     {
                         /* send all data with generation = localgeneration and version > maxRemoteVersion */
                         sendAll(gDigest, deltaEpStateMap, maxRemoteVersion);
+                    }
+                }
+            }
+            else
+            {
+                /* We are here since we have no data for this endpoint locally so request everything. */
+                requestAll(gDigest, deltaGossipDigestList, remoteGeneration);
+            }
+        }
+    }
+    
+    static void examineGossiperStatic(GossiperStub stub, List<GossipDigest> gDigestList, 
+            List<GossipDigest> deltaGossipDigestList, Map<InetAddress, EndpointState> deltaEpStateMap)
+    {
+        for ( GossipDigest gDigest : gDigestList )
+        {
+            int remoteGeneration = gDigest.getGeneration();
+            int maxRemoteVersion = gDigest.getMaxVersion();
+            /* Get state associated with the end point in digest */
+            EndpointState epStatePtr = stub.getEndpointStateMap().get(gDigest.getEndpoint());
+            /*
+                Here we need to fire a GossipDigestAckMessage. If we have some data associated with this endpoint locally
+                then we follow the "if" path of the logic. If we have absolutely nothing for this endpoint we need to
+                request all the data for this endpoint.
+            */
+            if ( epStatePtr != null )
+            {
+                int localGeneration = epStatePtr.getHeartBeatState().getGeneration();
+                /* get the max version of all keys in the state associated with this endpoint */
+                int maxLocalVersion = getMaxEndpointStateVersion(epStatePtr);
+                if ( remoteGeneration == localGeneration && maxRemoteVersion == maxLocalVersion )
+                    continue;
+
+                if ( remoteGeneration > localGeneration )
+                {
+                    /* we request everything from the gossiper */
+                    requestAll(gDigest, deltaGossipDigestList, remoteGeneration);
+                }
+                else if ( remoteGeneration < localGeneration )
+                {
+                    /* send all data with generation = localgeneration and version > 0 */
+                    sendAllStatic(stub, gDigest, deltaEpStateMap, 0);
+                }
+                else if ( remoteGeneration == localGeneration )
+                {
+                    /*
+                        If the max remote version is greater then we request the remote endpoint send us all the data
+                        for this endpoint with version greater than the max version number we have locally for this
+                        endpoint.
+                        If the max remote version is lesser, then we send all the data we have locally for this endpoint
+                        with version greater than the max remote version.
+                    */
+                    if ( maxRemoteVersion > maxLocalVersion )
+                    {
+                        deltaGossipDigestList.add( new GossipDigest(gDigest.getEndpoint(), remoteGeneration, maxLocalVersion) );
+                    }
+                    else if ( maxRemoteVersion < maxLocalVersion )
+                    {
+                        /* send all data with generation = localgeneration and version > maxRemoteVersion */
+                        sendAllStatic(stub, gDigest, deltaEpStateMap, maxRemoteVersion);
                     }
                 }
             }

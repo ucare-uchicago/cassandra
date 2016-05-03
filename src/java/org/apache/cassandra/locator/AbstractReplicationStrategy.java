@@ -23,9 +23,9 @@ import java.util.*;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.dht.RingPosition;
@@ -157,6 +157,16 @@ public abstract class AbstractReplicationStrategy
 
         return map;
     }
+    
+    public Multimap<InetAddress, Range<Token>> simulatedGetAddressRanges(TokenMetadata metadata) {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     public Multimap<Range<Token>, InetAddress> getRangeAddresses(TokenMetadata metadata)
     {
@@ -177,6 +187,11 @@ public abstract class AbstractReplicationStrategy
     public Multimap<InetAddress, Range<Token>> getAddressRanges()
     {
         return getAddressRanges(tokenMetadata.cloneOnlyTokenMap());
+    }
+
+    public Multimap<InetAddress, Range<Token>> simulatedGetAddressRanges()
+    {
+        return simulatedGetAddressRanges(tokenMetadata.cloneOnlyTokenMap());
     }
 
     public Collection<Range<Token>> getPendingAddressRanges(TokenMetadata metadata, Token pendingToken, InetAddress pendingAddress)

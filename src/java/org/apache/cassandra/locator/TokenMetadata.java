@@ -981,6 +981,10 @@ public class TokenMetadata
             lock.readLock().unlock();
         }
     }
+    
+    public int getSize() {
+        return tokenToEndpointMap.size();
+    }
 
     /**
      * @return a (stable copy, won't be modified) Token to Endpoint map for all the normal and bootstrapping nodes

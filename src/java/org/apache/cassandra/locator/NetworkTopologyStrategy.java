@@ -70,7 +70,7 @@ public class NetworkTopologyStrategy extends AbstractReplicationStrategy
         }
 
         datacenters = Collections.unmodifiableMap(newDatacenters);
-        logger.debug("Configured datacenter replicas are {}", FBUtilities.toString(datacenters));
+//        logger.debug("Configured datacenter replicas are {}", FBUtilities.toString(datacenters));
     }
 
     public List<InetAddress> calculateNaturalEndpoints(Token searchToken, TokenMetadata tokenMetadata)

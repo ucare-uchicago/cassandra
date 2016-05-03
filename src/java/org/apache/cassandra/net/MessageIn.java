@@ -33,6 +33,7 @@ import org.apache.cassandra.io.util.FileUtils;
 public class MessageIn<T>
 {
     public final InetAddress from;
+    public InetAddress to;
     public final T payload;
     public final Map<String, byte[]> parameters;
     public final MessagingService.Verb verb;
@@ -103,6 +104,14 @@ public class MessageIn<T>
     public long getTimeout()
     {
         return DatabaseDescriptor.getTimeout(verb);
+    }
+
+    public InetAddress getTo() {
+        return to;
+    }
+
+    public void setTo(InetAddress to) {
+        this.to = to;
     }
 
     public String toString()

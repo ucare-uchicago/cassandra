@@ -46,14 +46,14 @@ public class EndpointState
     private volatile long updateTimestamp;
     private volatile boolean isAlive;
 
-    EndpointState(HeartBeatState initialHbState)
+    public EndpointState(HeartBeatState initialHbState)
     {
         hbState = initialHbState;
         updateTimestamp = System.currentTimeMillis();
         isAlive = true;
     }
 
-    HeartBeatState getHeartBeatState()
+    public HeartBeatState getHeartBeatState()
     {
         return hbState;
     }
@@ -78,7 +78,7 @@ public class EndpointState
         return applicationState;
     }
 
-    void addApplicationState(ApplicationState key, VersionedValue value)
+    public void addApplicationState(ApplicationState key, VersionedValue value)
     {
         applicationState.put(key, value);
     }
@@ -89,7 +89,7 @@ public class EndpointState
         return updateTimestamp;
     }
 
-    void updateTimestamp()
+    public void updateTimestamp()
     {
         updateTimestamp = System.currentTimeMillis();
     }
@@ -99,12 +99,12 @@ public class EndpointState
         return isAlive;
     }
 
-    void markAlive()
+    public void markAlive()
     {
         isAlive = true;
     }
 
-    void markDead()
+    public void markDead()
     {
         isAlive = false;
     }

@@ -28,17 +28,21 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
 import static com.google.common.base.Charsets.ISO_8859_1;
+
 import com.google.common.collect.*;
+
+import edu.uchicago.cs.ucare.cassandra.gms.GossiperStub;
+
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.log4j.Level;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.concurrent.DebuggableScheduledThreadPoolExecutor;
 import org.apache.cassandra.concurrent.Stage;
 import org.apache.cassandra.concurrent.StageManager;
@@ -1120,10 +1124,49 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
                     handleStateRelocating(endpoint, pieces);
         }
     }
+    
+    public static void onChangeStatic(GossiperStub stub, InetAddress endpoint, 
+            ApplicationState state, VersionedValue value) {
+        switch (state) {
+            case STATUS:
+                String apStateValue = value.value;
+                String[] pieces = apStateValue.split(VersionedValue.DELIMITER_STR, -1);
+                assert (pieces.length > 0);
+
+                String moveName = pieces[0];
+
+                if (moveName.equals(VersionedValue.STATUS_BOOTSTRAPPING)) {
+                    handleStateBootstrapStatic(stub, endpoint, pieces);
+                } else if (moveName.equals(VersionedValue.STATUS_NORMAL)) {
+                    handleStateNormalStatic(stub, endpoint, pieces);
+                } else if (moveName.equals(VersionedValue.REMOVING_TOKEN) || moveName.equals(VersionedValue.REMOVED_TOKEN)) {
+                    throw new UnsupportedOperationException("This should not be called in CA-3881 workload");
+//                    handleStateRemoving(endpoint, pieces);
+                } else if (moveName.equals(VersionedValue.STATUS_LEAVING)) {
+                    throw new UnsupportedOperationException("This should not be called in CA-3881 workload");
+//                    handleStateLeaving(endpoint, pieces);
+                } else if (moveName.equals(VersionedValue.STATUS_LEFT)) {
+                    throw new UnsupportedOperationException("This should not be called in CA-3881 workload");
+//                    handleStateLeft(endpoint, pieces);
+                } else if (moveName.equals(VersionedValue.STATUS_MOVING)) {
+                    throw new UnsupportedOperationException("This should not be called in CA-3881 workload");
+//                    handleStateMoving(endpoint, pieces);
+                } else if (moveName.equals(VersionedValue.STATUS_RELOCATING)) {
+                    throw new UnsupportedOperationException("This should not be called in CA-3881 workload");
+//                    handleStateRelocating(endpoint, pieces);
+                }
+        }
+    }
 
     private byte[] getApplicationStateValue(InetAddress endpoint, ApplicationState appstate)
     {
         String vvalue = Gossiper.instance.getEndpointStateForEndpoint(endpoint).getApplicationState(appstate).value;
+        return vvalue.getBytes(ISO_8859_1);
+    }
+
+    private static byte[] getApplicationStateValueStatic(GossiperStub stub, InetAddress endpoint, ApplicationState appstate)
+    {
+        String vvalue = Gossiper.getEndpointStateForEndpointStatic(stub, endpoint).getApplicationState(appstate).value;
         return vvalue.getBytes(ISO_8859_1);
     }
 
@@ -1132,6 +1175,18 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         try
         {
             return TokenSerializer.deserialize(getPartitioner(), new DataInputStream(new ByteArrayInputStream(getApplicationStateValue(endpoint, ApplicationState.TOKENS))));
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+    
+    private static Collection<Token> getTokensForStatic(GossiperStub stub, InetAddress endpoint)
+    {
+        try
+        {
+            return TokenSerializer.deserialize(getPartitioner(), new DataInputStream(new ByteArrayInputStream(getApplicationStateValueStatic(stub, endpoint, ApplicationState.TOKENS))));
         }
         catch (IOException e)
         {
@@ -1182,6 +1237,44 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 
         if (Gossiper.instance.usesHostId(endpoint))
             tokenMetadata.updateHostId(Gossiper.instance.getHostId(endpoint), endpoint);
+    }
+    
+    private static void handleStateBootstrapStatic(GossiperStub stub, InetAddress endpoint, String[] pieces) {
+        assert pieces.length >= 2;
+
+        // Parse versioned values according to end-point version:
+        //   versions  < 1.2 .....: STATUS,TOKEN
+        //   versions >= 1.2 .....: use TOKENS app state
+        Collection<Token> tokens;
+        // explicitly check for TOKENS, because a bootstrapping node might be bootstrapping in legacy mode; that is, not using vnodes and no token specified
+        if (Gossiper.usesHostIdStatic(stub, endpoint) && stub.getEndpointStateMap().get(endpoint).getApplicationState(ApplicationState.TOKENS) != null)
+            tokens = getTokensForStatic(stub, endpoint);
+        else
+            tokens = Arrays.asList(stub.getPartitioner().getTokenFactory().fromString(pieces[1]));
+
+        if (logger.isDebugEnabled())
+            logger.debug("Node " + endpoint + " state bootstrapping, token " + tokens);
+
+        // if this node is present in token metadata, either we have missed intermediate states
+        // or the node had crashed. Print warning if needed, clear obsolete stuff and
+        // continue.
+        if (stub.getTokenMetadata().isMember(endpoint))
+        {
+            // If isLeaving is false, we have missed both LEAVING and LEFT. However, if
+            // isLeaving is true, we have only missed LEFT. Waiting time between completing
+            // leave operation and rebootstrapping is relatively short, so the latter is quite
+            // common (not enough time for gossip to spread). Therefore we report only the
+            // former in the log.
+            if (!stub.getTokenMetadata().isLeaving(endpoint))
+                logger.info("Node " + endpoint + " state jump to bootstrap");
+            stub.getTokenMetadata().removeEndpoint(endpoint);
+        }
+
+        stub.getTokenMetadata().addBootstrapTokens(tokens, endpoint);
+        calculatePendingRangesStatic(stub);
+
+        if (Gossiper.usesHostIdStatic(stub, endpoint))
+            stub.getTokenMetadata().updateHostId(Gossiper.getHostIdStatic(stub, endpoint), endpoint);
     }
 
     /**
@@ -1308,6 +1401,103 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
             tokenMetadata.removeFromMoving(endpoint);
 
         calculatePendingRanges();
+    }
+    
+    private static void handleStateNormalStatic(final GossiperStub stub, final InetAddress endpoint, String[] pieces) {
+        assert pieces.length >= 2;
+
+        Collection<Token> tokens;
+
+        if (Gossiper.usesHostIdStatic(stub, endpoint))
+            tokens = getTokensForStatic(stub, endpoint);
+        else
+            tokens = Arrays.asList(stub.getPartitioner().getTokenFactory().fromString(pieces[1]));
+
+        if (logger.isDebugEnabled())
+            logger.debug("Node " + endpoint + " state normal, token " + tokens);
+
+        if (stub.getTokenMetadata().isMember(endpoint))
+            logger.info("Node " + endpoint + " state jump to normal");
+
+        // Order Matters, TM.updateHostID() should be called before TM.updateNormalToken(), (see CASSANDRA-4300).
+        if (Gossiper.usesHostIdStatic(stub, endpoint))
+            stub.getTokenMetadata().updateHostId(Gossiper.getHostIdStatic(stub, endpoint), endpoint);
+
+        Set<Token> tokensToUpdateInMetadata = new HashSet<Token>();
+//        Set<Token> tokensToUpdateInSystemTable = new HashSet<Token>();
+        Set<Token> localTokensToRemove = new HashSet<Token>();
+        Set<InetAddress> endpointsToRemove = new HashSet<InetAddress>();
+        Multimap<InetAddress, Token> epToTokenCopy = stub.getTokenMetadata().getEndpointToTokenMapForReading();
+
+        for (final Token token : tokens) {
+            // we don't want to update if this node is responsible for the token and it has a later startup time than endpoint.
+            InetAddress currentOwner = stub.getTokenMetadata().getEndpoint(token);
+            if (currentOwner == null) {
+                logger.debug("New node " + endpoint + " at token " + token);
+                tokensToUpdateInMetadata.add(token);
+//                if (!isClientMode)
+//                    tokensToUpdateInSystemTable.add(token);
+            } else if (endpoint.equals(currentOwner)) {
+                // set state back to normal, since the node may have tried to leave, but failed and is now back up
+                // no need to persist, token/ip did not change
+                tokensToUpdateInMetadata.add(token);
+            } else if (stub.getTokenMetadata().isRelocating(token) && stub.getTokenMetadata().getRelocatingRanges().get(token).equals(endpoint)) {
+                // Token was relocating, this is the bookkeeping that makes it official.
+                tokensToUpdateInMetadata.add(token);
+//                if (!isClientMode)
+//                    tokensToUpdateInSystemTable.add(token);
+
+                // Korn check this
+                optionalTasks.schedule(new Runnable()
+                {
+                    public void run()
+                    {
+                        logger.info("Removing RELOCATION state for {} {}", endpoint, token);
+                        stub.getTokenMetadata().removeFromRelocating(token, endpoint);
+                    }
+                }, RING_DELAY, TimeUnit.MILLISECONDS);
+
+                // We used to own this token; This token will need to be removed from system.local 
+                if (currentOwner.equals(FBUtilities.getBroadcastAddress()))
+                    localTokensToRemove.add(token);
+
+                logger.info("Token {} relocated to {}", token, endpoint);
+            } else if (stub.getTokenMetadata().isRelocating(token)) {
+                logger.info("Token {} is relocating to {}, ignoring update from {}",
+                        new Object[]{token, stub.getTokenMetadata().getRelocatingRanges().get(token), endpoint});
+            } else if (Gossiper.compareEndpointStartupStatic(stub, endpoint, currentOwner) > 0) {
+                tokensToUpdateInMetadata.add(token);
+//                if (!isClientMode)
+//                    tokensToUpdateInSystemTable.add(token);
+
+                // currentOwner is no longer current, endpoint is.  Keep track of these moves, because when
+                // a host no longer has any tokens, we'll want to remove it.
+                epToTokenCopy.get(currentOwner).remove(token);
+                if (epToTokenCopy.get(currentOwner).size() < 1)
+                    endpointsToRemove.add(currentOwner);
+
+                logger.info(String.format("Nodes %s and %s have the same token %s.  %s is the new owner",
+                                          endpoint, currentOwner, token, endpoint));
+                if (logger.isDebugEnabled())
+                    logger.debug("Relocating ranges: {}", stub.getTokenMetadata().printRelocatingRanges());
+            } else {
+                logger.info(String.format("Nodes %s and %s have the same token %s.  Ignoring %s",
+                                           endpoint, currentOwner, token, endpoint));
+                if (logger.isDebugEnabled())
+                    logger.debug("Relocating ranges: {}", stub.getTokenMetadata().printRelocatingRanges());
+            }
+        }
+
+        stub.getTokenMetadata().updateNormalTokens(tokensToUpdateInMetadata, endpoint);
+        for (InetAddress ep : endpointsToRemove)
+            stub.removeEndpoint(ep);
+//        SystemTable.updateTokens(endpoint, tokensToUpdateInSystemTable);
+//        SystemTable.updateLocalTokens(Collections.<Token>emptyList(), localTokensToRemove);
+
+        if (stub.getTokenMetadata().isMoving(endpoint)) // if endpoint was moving to a new token
+            stub.getTokenMetadata().removeFromMoving(endpoint);
+
+        calculatePendingRangesStatic(stub);
     }
 
     /**
@@ -1532,6 +1722,12 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         for (String table : Schema.instance.getNonSystemTables())
             calculatePendingRanges(Table.open(table).getReplicationStrategy(), table);
     }
+    
+    private static void calculatePendingRangesStatic(GossiperStub stub) {
+        for (String table : stub.getTables()) {
+            calculatePendingRanges(stub.getStrategy(table), table);
+        }
+    }
 
     // public & static for testing purposes
     public static void calculatePendingRanges(AbstractReplicationStrategy strategy, String table)
@@ -1621,6 +1817,94 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 
         if (logger.isDebugEnabled())
             logger.debug("Pending ranges:\n" + (pendingRanges.isEmpty() ? "<empty>" : tm.printPendingRanges()));
+    }
+    
+    public static void simulatedCalculatePendingRanges(GossiperStub stub, AbstractReplicationStrategy strategy, String table) {
+        TokenMetadata tm = stub.getTokenMetadata();
+        Multimap<Range<Token>, InetAddress> pendingRanges = HashMultimap.create();
+        BiMultiValMap<Token, InetAddress> bootstrapTokens = tm.getBootstrapTokens();
+        Set<InetAddress> leavingEndpoints = tm.getLeavingEndpoints();
+
+        if (bootstrapTokens.isEmpty() && leavingEndpoints.isEmpty() && tm.getMovingEndpoints().isEmpty() && tm.getRelocatingRanges().isEmpty())
+        {
+            if (logger.isDebugEnabled())
+                logger.debug("No bootstrapping, leaving or moving nodes, and no relocating tokens -> empty pending ranges for {}", table);
+            tm.setPendingRanges(table, pendingRanges);
+            return;
+        }
+
+        Multimap<InetAddress, Range<Token>> addressRanges = strategy.simulatedGetAddressRanges();
+
+        // Copy of metadata reflecting the situation after all leave operations are finished.
+        TokenMetadata allLeftMetadata = tm.cloneAfterAllLeft();
+
+        // get all ranges that will be affected by leaving nodes
+//        Set<Range<Token>> affectedRanges = new HashSet<Range<Token>>();
+//        for (InetAddress endpoint : leavingEndpoints)
+//            affectedRanges.addAll(addressRanges.get(endpoint));
+
+        // for each of those ranges, find what new nodes will be responsible for the range when
+        // all leaving nodes are gone.
+//        for (Range<Token> range : affectedRanges)
+//        {
+//            Set<InetAddress> currentEndpoints = ImmutableSet.copyOf(strategy.calculateNaturalEndpoints(range.right, tm.cloneOnlyTokenMap()));
+//            Set<InetAddress> newEndpoints = ImmutableSet.copyOf(strategy.calculateNaturalEndpoints(range.right, allLeftMetadata));
+//            pendingRanges.putAll(range, Sets.difference(newEndpoints, currentEndpoints));
+//        }
+
+        // At this stage pendingRanges has been updated according to leave operations. We can
+        // now continue the calculation by checking bootstrapping nodes.
+
+        // For each of the bootstrapping nodes, simply add and remove them one by one to
+        // allLeftMetadata and check in between what their ranges would be.
+        for (InetAddress endpoint : bootstrapTokens.inverse().keySet())
+        {
+            Collection<Token> tokens = bootstrapTokens.inverse().get(endpoint);
+            
+            allLeftMetadata.updateNormalTokens(tokens, endpoint);
+            for (Range<Token> range : strategy.simulatedGetAddressRanges(allLeftMetadata).get(endpoint))
+                pendingRanges.put(range, endpoint);
+            allLeftMetadata.removeEndpoint(endpoint);
+        }
+
+        // At this stage pendingRanges has been updated according to leaving and bootstrapping nodes.
+        // We can now finish the calculation by checking moving and relocating nodes.
+
+        // For each of the moving nodes, we do the same thing we did for bootstrapping:
+        // simply add and remove them one by one to allLeftMetadata and check in between what their ranges would be.
+//        for (Pair<Token, InetAddress> moving : tm.getMovingEndpoints())
+//        {
+//            InetAddress endpoint = moving.right; // address of the moving node
+//
+//            //  moving.left is a new token of the endpoint
+//            allLeftMetadata.updateNormalToken(moving.left, endpoint);
+//
+//            for (Range<Token> range : strategy.getAddressRanges(allLeftMetadata).get(endpoint))
+//            {
+//                pendingRanges.put(range, endpoint);
+//            }
+//
+//            allLeftMetadata.removeEndpoint(endpoint);
+//        }
+
+        // Ranges being relocated.
+//        for (Map.Entry<Token, InetAddress> relocating : tm.getRelocatingRanges().entrySet())
+//        {
+//            InetAddress endpoint = relocating.getValue(); // address of the moving node
+//            Token token = relocating.getKey();
+//
+//            allLeftMetadata.updateNormalToken(token, endpoint);
+//
+//            for (Range<Token> range : strategy.getAddressRanges(allLeftMetadata).get(endpoint))
+//                pendingRanges.put(range, endpoint);
+//
+//            allLeftMetadata.removeEndpoint(endpoint);
+//        }
+
+        tm.setPendingRanges(table, pendingRanges);
+
+//        if (logger.isDebugEnabled())
+//            logger.debug("Pending ranges:\n" + (pendingRanges.isEmpty() ? "<empty>" : tm.printPendingRanges()));
     }
 
     /**
@@ -1801,11 +2085,25 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
             onChange(endpoint, entry.getKey(), entry.getValue());
         }
     }
+    
+    public static void onJoinStatic(GossiperStub stub, InetAddress endpoint, EndpointState epState)
+    {
+        for (Map.Entry<ApplicationState, VersionedValue> entry : epState.getApplicationStateMap().entrySet())
+        {
+            onChangeStatic(stub, endpoint, entry.getKey(), entry.getValue());
+        }
+    }
 
     public void onAlive(InetAddress endpoint, EndpointState state)
     {
         if (!isClientMode && getTokenMetadata().isMember(endpoint))
             HintedHandOffManager.instance.scheduleHintDelivery(endpoint);
+    }
+    
+    public static void onAliveStatic(GossiperStub stub, InetAddress endpoint, EndpointState state)
+    {
+//        if (!isClientMode && getTokenMetadata().isMember(endpoint))
+//            HintedHandOffManager.instance.scheduleHintDelivery(endpoint);
     }
 
     public void onRemove(InetAddress endpoint)
@@ -1818,12 +2116,24 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     {
         MessagingService.instance().convict(endpoint);
     }
+    
+    public static void onDeadStatic(GossiperStub stub, InetAddress endpoint, EndpointState state)
+    {
+//        MessagingService.instance().convict(endpoint);
+    }
 
     public void onRestart(InetAddress endpoint, EndpointState state)
     {
         // If we have restarted before the node was even marked down, we need to reset the connection pool
         if (state.isAlive())
             onDead(endpoint, state);
+    }
+    
+    public static void onRestartStatic(GossiperStub stub, InetAddress endpoint, EndpointState state)
+    {
+        // If we have restarted before the node was even marked down, we need to reset the connection pool
+        if (state.isAlive())
+            onDeadStatic(stub, endpoint, state);
     }
 
     /** raw load value */
