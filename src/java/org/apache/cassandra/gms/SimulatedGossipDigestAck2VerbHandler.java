@@ -34,8 +34,9 @@ public class SimulatedGossipDigestAck2VerbHandler implements IVerbHandler<Gossip
 
     public void doVerb(MessageIn<GossipDigestAck2> message, String id)
     {
-//        InetAddress from = message.from;
+        InetAddress from = message.from;
         InetAddress to = message.getTo();
+        logger.info("{} receives ack2 {}", to, from);
         GossiperStub stub = GossipSimulator.getStub(to);
         Map<InetAddress, EndpointState> remoteEpStateMap = message.payload.getEndpointStateMap();
         /* Notify the Failure Detector */

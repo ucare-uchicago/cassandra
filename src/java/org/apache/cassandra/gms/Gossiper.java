@@ -681,6 +681,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     
     public static UUID getHostIdStatic(GossiperStub stub, InetAddress endpoint)
     {
+        System.out.println(stub + " " + endpoint);
         if (!usesHostIdStatic(stub, endpoint))
             throw new RuntimeException("Host " + endpoint + " does not use new-style tokens!");
         return UUID.fromString(stub.getEndpointStateMap().get(endpoint).getApplicationState(ApplicationState.HOST_ID).value);

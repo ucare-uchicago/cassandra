@@ -54,7 +54,8 @@ public class GossipSimulator {
     
     public static final String CLUSTER_NAME = "sck";
     
-    private static long cprTime;
+//    private static long cprTime;
+    private static final Map<Integer, Long> memoizedTime = new HashMap<Integer, Long>();
 
     public static int numNodes;
     public static int ringSize;
@@ -81,7 +82,6 @@ public class GossipSimulator {
         }
         Klogger.scale.info("Number of tables is {}", numTables);
         try {
-            cprTime = -1;
             BufferedReader reader = new BufferedReader(new FileReader(args[2]));
             String line = null;
             while ((line = reader.readLine()) != null) {
@@ -91,16 +91,10 @@ public class GossipSimulator {
                     System.exit(3);
                 }
                 int tmpSize = Integer.parseInt(entry[0]);
-                if (tmpSize == numNodes) {
-                    cprTime = Long.parseLong(entry[1]);
-                    break;
-                }
+                long tmpTime = Long.parseLong(entry[1]);
+                memoizedTime.put(tmpSize, tmpTime);
             }
             reader.close();
-            if (cprTime == -1) {
-                System.err.println("Profiling file does not have profile for " + numNodes + "-node cluster");
-                System.exit(3);
-            }
         } catch (FileNotFoundException e) {
             System.err.println("Cannot open profiling file, " + args[2]);
             System.exit(2);
@@ -108,7 +102,7 @@ public class GossipSimulator {
             System.err.println("Cannot read profiling file, " + args[2]);
             System.exit(2);
         }
-        Klogger.scale.info("calculatePendingRanges will takes {} ms", cprTime);
+//        Klogger.scale.info("calculatePendingRanges will takes {} ms", cprTime);
         int numGossipSendingWorker = Integer.parseInt(args[3]);
         numGossipSendingWorker = numGossipSendingWorker < 1 ? 1 : numGossipSendingWorker;
         Set<InetAddress> seeds = new HashSet<InetAddress>();
@@ -128,8 +122,9 @@ public class GossipSimulator {
             t.start();
             stub.maybeInitializeLocalState((int) (System.currentTimeMillis() / 1000));
             stub.prepareInitialState();
-            stub.updateNormalTokens();
-            stub.setNormalStatusState();
+            stub.setBootStrappingStatusState();
+//            stub.updateNormalTokens();
+//            stub.setNormalStatusState();
             subGroup.get(x).add(stub);
             x = (x + 1) % numGossipSendingWorker;
         }
@@ -304,8 +299,12 @@ public class GossipSimulator {
         return gossiperGroup.getStub(address);
     }
     
-    public static long getCprTime() {
-        return cprTime;
+//    public static long getCprTime() {
+//        return cprTime;
+//    }
+    
+    public static long getMemoizedTime(int size) {
+        return memoizedTime.get(size);
     }
     
     public static boolean isRingStable() {
@@ -333,13 +332,12 @@ public class GossipSimulator {
                 for (GossiperStub stub : gossiperGroup) {
                     totalAccuDown += stub.getAccuDown();
                 }
-                double sendLateness = 0;
-                for (GroupedGossiperTask gossipTask : gossipTasks) {
-                    sendLateness += gossipTask.averageInterval();
-                }
-                sendLateness /= gossipTasks.length;
-//                Klogger.scale.info("Ring: stable {} accuDown {} sendLate {} maxSendLate {}", allRingComplete, 
-//                        totalAccuDown, sendLateness, GroupedGossiperTask.getMaxLate());
+//                double sendLateness = 0;
+//                for (GroupedGossiperTask gossipTask : gossipTasks) {
+//                    sendLateness += gossipTask.averageInterval();
+//                }
+//                sendLateness /= gossipTasks.length;
+                Klogger.scale.info("Ring: stable {} accuDown {}", allRingComplete, totalAccuDown);
                 try {
                     Thread.sleep(2000);
                 } catch (InterruptedException e) {

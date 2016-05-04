@@ -87,15 +87,15 @@ public class DynamicEndpointSnitch extends AbstractEndpointSnitch implements ILa
 
     private void registerMBean()
     {
-        MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-        try
-        {
-            mbs.registerMBean(this, new ObjectName(mbeanName));
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException(e);
-        }
+//        MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+//        try
+//        {
+//            mbs.registerMBean(this, new ObjectName(mbeanName));
+//        }
+//        catch (Exception e)
+//        {
+//            throw new RuntimeException(e);
+//        }
     }
 
     public void unregisterMBean()

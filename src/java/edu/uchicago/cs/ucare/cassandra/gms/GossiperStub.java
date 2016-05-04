@@ -155,6 +155,7 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
     }
     
     public void prepareInitialState() {
+        state.addApplicationState(ApplicationState.NET_VERSION, versionedValueFactory.networkVersion());
         state.addApplicationState(ApplicationState.RPC_ADDRESS, versionedValueFactory.rpcaddress(broadcastAddress));
         state.addApplicationState(ApplicationState.RELEASE_VERSION, versionedValueFactory.releaseVersion());
     }

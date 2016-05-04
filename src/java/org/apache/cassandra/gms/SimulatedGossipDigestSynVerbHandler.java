@@ -29,6 +29,7 @@ import org.apache.cassandra.net.MessagingService;
 
 import edu.uchicago.cs.ucare.cassandra.gms.GossiperStub;
 import edu.uchicago.cs.ucare.cassandra.gms.simulation.GossipSimulator;
+import edu.uchicago.cs.ucare.util.Klogger;
 
 public class SimulatedGossipDigestSynVerbHandler implements IVerbHandler<GossipDigestSyn>
 {
@@ -39,6 +40,7 @@ public class SimulatedGossipDigestSynVerbHandler implements IVerbHandler<GossipD
     {
         InetAddress from = message.from;
         InetAddress to = message.getTo();
+        logger.info("{} receives syn {}", to, from);
         GossiperStub stub = GossipSimulator.getStub(to);
 //        if (logger.isTraceEnabled())
 //            logger.trace("Received a GossipDigestSynMessage from {}", from);
@@ -82,6 +84,7 @@ public class SimulatedGossipDigestSynVerbHandler implements IVerbHandler<GossipD
         List<GossipDigest> deltaGossipDigestList = new ArrayList<GossipDigest>();
         Map<InetAddress, EndpointState> deltaEpStateMap = new HashMap<InetAddress, EndpointState>();
         Gossiper.examineGossiperStatic(stub, gDigestList, deltaGossipDigestList, deltaEpStateMap);
+        logger.info("syn digest {} deltadigest {} delta " + deltaEpStateMap, gDigestList, deltaGossipDigestList);
 
 //        MessageOut<GossipDigestAck> gDigestAckMessage = 
 //                new MessageOut<GossipDigestAck>(MessagingService.Verb.GOSSIP_DIGEST_ACK,
