@@ -24,6 +24,8 @@ import java.util.*;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 
+import edu.uchicago.cs.ucare.cassandra.gms.simulation.GossipSimulator;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.cassandra.exceptions.ConfigurationException;
@@ -160,7 +162,8 @@ public abstract class AbstractReplicationStrategy
     
     public Multimap<InetAddress, Range<Token>> simulatedGetAddressRanges(TokenMetadata metadata) {
         try {
-            Thread.sleep(10);
+            long sleepTime = GossipSimulator.getMemoizedTime(metadata.getSize());
+            Thread.sleep(sleepTime);
         } catch (InterruptedException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();

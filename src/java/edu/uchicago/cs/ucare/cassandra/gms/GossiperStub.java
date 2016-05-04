@@ -45,6 +45,7 @@ import org.cliffc.high_scale_lib.NonBlockingHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import edu.uchicago.cs.ucare.cassandra.gms.simulation.GossipSimulator;
 import edu.uchicago.cs.ucare.scale.InetAddressStub;
 
 public class GossiperStub implements InetAddressStub, IFailureDetectionEventListener {
@@ -462,7 +463,9 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
         liveEndpoints.remove(addr);
         unreachableEndpoints.put(addr, System.currentTimeMillis());
         logger.info("{} thinks {} is now dead.", broadcastAddress, addr);
-        accuDown++;
+        if (GossipSimulator.added) {
+            accuDown++;
+        }
 //      for (IEndpointStateChangeSubscriber subscriber : subscribers)
 //            subscriber.onDead(addr, localState);
 //        if (logger.isTraceEnabled())
@@ -517,6 +520,7 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
         // do subscribers first so anything in the subscriber that depends on gossiper state won't get confused
 //        for (IEndpointStateChangeSubscriber subscriber : subscribers)
 //            subscriber.onRemove(endpoint);
+        StorageService.onRemoveStatic(this, endpoint);
 
         liveEndpoints.remove(endpoint);
         unreachableEndpoints.remove(endpoint);

@@ -38,6 +38,7 @@ import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.FBUtilities;
 
 import edu.uchicago.cs.ucare.cassandra.gms.GossiperStub;
+import edu.uchicago.cs.ucare.cassandra.gms.simulation.GossipSimulator;
 
 /**
  * This module is responsible for Gossiping information for the local endpoint. This abstraction
@@ -928,14 +929,16 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     {
         if (!stub.isDeadState(epState))
         {
-            if (stub.getEndpointStateMap().get(ep) != null)
-                logger.info("Node {} has restarted, now UP", ep);
-            else
-                logger.info("Node {} is now part of the cluster", ep);
+            if (stub.getEndpointStateMap().get(ep) != null) {
+                logger.info("{} Node {} has restarted, now UP", stub, ep);
+            } else {
+                logger.info("{} Node {} is now part of the cluster", stub, ep);
+            }
         }
         if (logger.isTraceEnabled())
             logger.trace("Adding endpoint state for " + ep);
-        stub.getEndpointStateMap().put(ep, epState);
+//        stub.getEndpointStateMap().put(ep, epState);
+        stub.getEndpointStateMap().put(ep, GossipSimulator.getStub(ep).getEndpointState().copy());
 
         // the node restarted: it is up to the subscriber to take whatever action is necessary
         StorageService.onRestartStatic(stub, ep, epState);

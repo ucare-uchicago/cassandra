@@ -504,6 +504,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         // (we won't be part of the storage ring though until we add a counterId to our state, below.)
         Gossiper.instance.register(this);
         Gossiper.instance.register(migrationManager);
+        logger.info("louise start");
         Gossiper.instance.start(SystemTable.incrementAndGetGeneration()); // needed for node-ring gathering.
         // gossip network proto version
         Gossiper.instance.addLocalApplicationState(ApplicationState.NET_VERSION, valueFactory.networkVersion());
@@ -819,6 +820,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
             // if not an existing token then bootstrap
             // order is important here, the gossiper can fire in between adding these two states.  It's ok to send TOKENS without STATUS, but *not* vice versa.
             Gossiper.instance.addLocalApplicationState(ApplicationState.TOKENS, valueFactory.tokens(tokens));
+            logger.info("louise end");
             Gossiper.instance.addLocalApplicationState(ApplicationState.STATUS,
                                                        valueFactory.bootstrapping(tokens));
             setMode(Mode.JOINING, "sleeping " + RING_DELAY + " ms for pending range setup", true);
@@ -1203,6 +1205,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
      */
     private void handleStateBootstrap(InetAddress endpoint, String[] pieces)
     {
+        logger.info("{} is boot", endpoint);
         assert pieces.length >= 2;
 
         // Parse versioned values according to end-point version:
@@ -1287,6 +1290,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
      */
     private void handleStateNormal(final InetAddress endpoint, String[] pieces)
     {
+        logger.info("{} is normal", endpoint);
         assert pieces.length >= 2;
 
         // Parse versioned values according to end-point version:
@@ -1720,17 +1724,24 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
      */
     private void calculatePendingRanges()
     {
-        for (String table : Schema.instance.getNonSystemTables())
+        for (String table : Schema.instance.getNonSystemTables()) {
+            long time = System.currentTimeMillis();
             calculatePendingRanges(Table.open(table).getReplicationStrategy(), table);
+            time = System.currentTimeMillis() - time;
+            logger.info("cpr took {} ms", time);
+        }
     }
     
     private static void calculatePendingRangesStatic(GossiperStub stub) {
+        long elTime = System.currentTimeMillis();
         for (String table : stub.getTables()) {
             long time = System.currentTimeMillis();
             simulatedCalculatePendingRanges(stub, stub.getStrategy(table), table);
             time = System.currentTimeMillis() - time;
-            logger.info("cpr took {} ms", time);
+            logger.debug("cpr for {} took {} ms", table, time);
         }
+        elTime = System.currentTimeMillis() - elTime;
+        logger.info("cpr took {} ms", elTime);
     }
 
     // public & static for testing purposes
@@ -1745,6 +1756,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         {
             if (logger.isDebugEnabled())
                 logger.debug("No bootstrapping, leaving or moving nodes, and no relocating tokens -> empty pending ranges for {}", table);
+            logger.info("No bootstrapping, leaving or moving nodes, and no relocating tokens -> empty pending ranges for {}", table);
             tm.setPendingRanges(table, pendingRanges);
             return;
         }
@@ -2114,6 +2126,11 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     {
         tokenMetadata.removeEndpoint(endpoint);
         calculatePendingRanges();
+    }
+
+    public static void onRemoveStatic(GossiperStub stub, InetAddress endpoint) {
+        stub.getTokenMetadata().removeEndpoint(endpoint);
+//        calculatePendingRanges();
     }
 
     public void onDead(InetAddress endpoint, EndpointState state)

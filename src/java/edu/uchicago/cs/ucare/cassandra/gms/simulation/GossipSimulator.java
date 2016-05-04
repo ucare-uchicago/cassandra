@@ -133,8 +133,10 @@ public class GossipSimulator {
             gossipSendingWorkers[i].schedule(gossipTasks[i], 0, 1000);
         }
         List<GossiperStub> firstHalf = gossiperGroup.getFirstHalf();
-        startSomeGossipers(firstHalf);
         try {
+            startSomeGossipers(firstHalf);
+            Thread.sleep(GossiperStub.RING_DELAY);
+            setBootStrap(firstHalf);
             Thread.sleep(GossiperStub.RING_DELAY);
             for (GossiperStub stub : firstHalf) {
                 stub.updateNormalTokens();
@@ -169,20 +171,19 @@ public class GossipSimulator {
         for (GossiperStub stub : firstHalf) {
             stub.setTables(numTables, 1);
         }
-//        try {
-//            Thread.sleep(10000000);
-//        } catch (InterruptedException e1) {
-//            // TODO Auto-generated catch block
-//            e1.printStackTrace();
-//        }
-        List<GossiperStub> secondHalf = gossiperGroup.getSecondHalf();
-        startSomeGossipers(secondHalf);
-        for (GossiperStub stub : secondHalf) {
-            stub.setTables(numTables, 1);
-        }
+        Klogger.scale.info("First half is stable");
         Thread clusterMonitor = new Thread(new ClusterMonitor());
         clusterMonitor.start();
+        added = true;
+        List<GossiperStub> secondHalf = gossiperGroup.getSecondHalf();
         try {
+            Klogger.scale.info("Starting second half");
+            startSomeGossipers(secondHalf);
+            Thread.sleep(GossiperStub.RING_DELAY);
+            for (GossiperStub stub : secondHalf) {
+                stub.setTables(numTables, 1);
+            }
+            setBootStrap(secondHalf);
             Thread.sleep(GossiperStub.RING_DELAY);
             for (GossiperStub stub : secondHalf) {
                 stub.updateNormalTokens();
@@ -413,8 +414,13 @@ public class GossipSimulator {
         for (GossiperStub stub : gossipers) {
             stub.maybeInitializeLocalState((int) (System.currentTimeMillis() / 1000));
             stub.prepareInitialState();
-            stub.setBootStrappingStatusState();
             stub.setRunning(true);
+        }
+    }
+    
+    public static void setBootStrap(List<GossiperStub> gossipers) {
+        for (GossiperStub stub : gossipers) {
+            stub.setBootStrappingStatusState();
         }
     }
     
