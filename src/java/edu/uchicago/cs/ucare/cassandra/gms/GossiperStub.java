@@ -60,7 +60,7 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
     };
     private static final Logger logger = LoggerFactory.getLogger(GossiperStub.class);
     
-    public static final int RING_DELAY = 15 * 1000; 
+    public static final int RING_DELAY = 30 * 1000; 
     public final static int QUARANTINE_DELAY = RING_DELAY * 2;
     public final static long FatClientTimeout = (long) (RING_DELAY);
     public long aVeryLongTime = 259200 * 1000;
@@ -86,7 +86,6 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
     private Map<InetAddress, Long> justRemovedEndpoints;
     private Map<InetAddress, Long> expireTimeEndpointMap;
     private Set<InetAddress> seeds;
-//    private final ConcurrentMap<InetAddress, Integer> versions = new NonBlockingHashMap<InetAddress, Integer>();
     private List<String> tables;
     private Map<String, AbstractReplicationStrategy> strategies;
     private boolean isRunning;
@@ -96,16 +95,6 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
     
     private static final Random random = new Random();
 
-//    static {
-//        SimpleSnitch simpleSnitch = new SimpleSnitch();
-//        DynamicEndpointSnitch dynamicSnitch = new DynamicEndpointSnitch(simpleSnitch);
-//        Map<String, String> strategyOptions = new HashMap<String, String>();
-//        strategyOptions.put("datacenter1", replicationFactor);
-//        TokenMetadata testStubTokenMetadata = stub.getTokenMetadata();
-//        testStubTokenMetadata.addLeavingEndpoint(InetAddress.getByName("127.0.0.2"));
-//        NetworkTopologyStrategy strategy = new NetworkTopologyStrategy("table1", testStubTokenMetadata, dynamicSnitch, strategyOptions);
-//    }
-    
     private static Collection<Token> getRandomToken(IPartitioner<?> partitioner, int numTokens) {
         Set<Token> tokens = new HashSet<Token>(numTokens);
         while (tokens.size() < numTokens)
@@ -137,7 +126,7 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
         state = null;
         versionedValueFactory = new VersionedValueFactory(partitioner);
         hasContactedSeed = false;
-        isRunning = true;
+        isRunning = false;
         accuDown = 0;
         tokenMetadata = new TokenMetadata();
         failureDetector = new FailureDetector();
@@ -473,6 +462,7 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
         liveEndpoints.remove(addr);
         unreachableEndpoints.put(addr, System.currentTimeMillis());
         logger.info("{} thinks {} is now dead.", broadcastAddress, addr);
+        accuDown++;
 //      for (IEndpointStateChangeSubscriber subscriber : subscribers)
 //            subscriber.onDead(addr, localState);
 //        if (logger.isTraceEnabled())

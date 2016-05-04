@@ -5,6 +5,8 @@ import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -17,7 +19,8 @@ public class RandomTokenGossiperStubGroup implements InetAddressStubGroup<Gossip
     private Map<InetAddress, GossiperStub> stubs;
     private String clusterId;
     private IPartitioner<?> partitioner;
-    private GossiperStub decommissionNode;
+    private List<GossiperStub> firstHalf;
+    private List<GossiperStub> secondHalf;
 
     public RandomTokenGossiperStubGroup(String clusterId, String dataCenter, int numNodes,
             Set<InetAddress> seeds, IPartitioner<?> partitioner, int numTokens)
@@ -25,14 +28,19 @@ public class RandomTokenGossiperStubGroup implements InetAddressStubGroup<Gossip
         this.clusterId = clusterId;
         this.partitioner = partitioner;
         stubs = new HashMap<InetAddress, GossiperStub>();
+        firstHalf = new LinkedList<GossiperStub>();
+        secondHalf = new LinkedList<GossiperStub>();
+        int half = numNodes / 2;
         for (int i = 0; i < numNodes; ++i) {
             int a = i / 255;
             int b = i % 255;
             InetAddress address = InetAddress.getByName("127.0." + a + "." + (b + 1));
             stubs.put(address, new GossiperStub(address, clusterId, dataCenter, 
                     seeds, partitioner, numTokens));
-            if (i == (numNodes - 1)) {
-                decommissionNode = stubs.get(address);
+            if (i < half) {
+                firstHalf.add(stubs.get(address));
+            } else {
+                secondHalf.add(stubs.get(address));
             }
         }
     }
@@ -88,15 +96,19 @@ public class RandomTokenGossiperStubGroup implements InetAddressStubGroup<Gossip
     public int size() {
        return stubs.size();
     }
-    
-    public GossiperStub getDecommissionNode() {
-        return decommissionNode;
-    }
 
     public void setTables(int numTables, int replicationFactor) {
         for (GossiperStub stub : stubs.values()) {
             stub.setTables(numTables, replicationFactor);
         }
+    }
+    
+    public List<GossiperStub> getFirstHalf() {
+        return firstHalf;
+    }
+
+    public List<GossiperStub> getSecondHalf() {
+        return secondHalf;
     }
 
 }

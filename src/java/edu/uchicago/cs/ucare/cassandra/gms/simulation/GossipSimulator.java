@@ -53,6 +53,8 @@ public class GossipSimulator {
     
     public static final String CLUSTER_NAME = "sck";
     
+    public static final int NUM_TOKENS = 32;
+    
 //    private static long cprTime;
     private static final Map<Integer, Long> memoizedTime = new HashMap<Integer, Long>();
 
@@ -101,13 +103,13 @@ public class GossipSimulator {
             System.err.println("Cannot read profiling file, " + args[2]);
             System.exit(2);
         }
-//        Klogger.scale.info("calculatePendingRanges will takes {} ms", cprTime);
         int numGossipSendingWorker = Integer.parseInt(args[3]);
         numGossipSendingWorker = numGossipSendingWorker < 1 ? 1 : numGossipSendingWorker;
         Set<InetAddress> seeds = new HashSet<InetAddress>();
         seeds.add(InetAddress.getByName("127.0.0.1"));
-        gossiperGroup = new RandomTokenGossiperStubGroup(CLUSTER_NAME, "datacenter1", numNodes, seeds, new RandomPartitioner(), 32);
-        gossiperGroup.setTables(numTables, 1);
+        gossiperGroup = new RandomTokenGossiperStubGroup(CLUSTER_NAME, "datacenter1", numNodes, 
+                seeds, new RandomPartitioner(), NUM_TOKENS);
+//        gossiperGroup.setTables(numTables, 1);
         msgQueues = new HashMap<InetAddress, LinkedBlockingQueue<MessageIn>>();
         Klogger.scale.info("Starting worker threads");
         List<List<GossiperStub>> subGroup = new ArrayList<List<GossiperStub>>();
@@ -119,9 +121,6 @@ public class GossipSimulator {
             msgQueues.put(stub.getInetAddress(), new LinkedBlockingQueue<MessageIn>());
             Thread t = new Thread(new GossipWorker(stub.getInetAddress()));
             t.start();
-            stub.maybeInitializeLocalState((int) (System.currentTimeMillis() / 1000));
-            stub.prepareInitialState();
-            stub.setBootStrappingStatusState();
             subGroup.get(x).add(stub);
             x = (x + 1) % numGossipSendingWorker;
         }
@@ -132,17 +131,56 @@ public class GossipSimulator {
             gossipTasks[i] = new GroupedGossiperTask(subGroup.get(i));
             gossipSendingWorkers[i].schedule(gossipTasks[i], 0, 1000);
         }
-        Thread clusterMonitor = new Thread(new ClusterMonitor());
-        clusterMonitor.start();
+//        for (InetAddress seedAddr : seeds) {
+//            GossiperStub stub = gossiperGroup.getStub(seedAddr);
+//            stub.setRunning(true);
+//            stub.updateNormalTokens();
+//            stub.setNormalStatusState();
+//        }
+        List<GossiperStub> firstHalf = gossiperGroup.getFirstHalf();
+        startSomeGossipers(firstHalf);
         try {
             Thread.sleep(GossiperStub.RING_DELAY);
-            for (GossiperStub stub : gossiperGroup) {
+            for (GossiperStub stub : firstHalf) {
                 stub.updateNormalTokens();
                 stub.setNormalStatusState();
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        boolean firstHalfStable = false;
+        int firstHalfTokens = firstHalf.size() * NUM_TOKENS;
+        do {
+            firstHalfStable = true;
+            for (GossiperStub stub : firstHalf) {
+                if(stub.getTokenMetadata().getSize() != firstHalfTokens) {
+                    firstHalfStable = false;
+                    break;
+                }
+                for (EndpointState state : stub.getEndpointStateMap().values()) {
+                    if (!state.isAlive()) {
+                        firstHalfStable = false;
+                        break;
+                    }
+                }
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        } while (!firstHalfStable);
+        for (GossiperStub stub : firstHalf) {
+            stub.setTables(numTables, 1);
+        }
+        List<GossiperStub> secondHalf = gossiperGroup.getSecondHalf();
+        startSomeGossipers(secondHalf);
+        for (GossiperStub stub : secondHalf) {
+            stub.setTables(numTables, 1);
+        }
+        Thread clusterMonitor = new Thread(new ClusterMonitor());
+        clusterMonitor.start();
     }
     
     public RandomTokenGossiperStubGroup getGossiperGroup() {
@@ -177,6 +215,9 @@ public class GossipSimulator {
             }
             previousRun = start;
             for (GossiperStub performer : stubs) {
+                if (!performer.isRunning()) {
+                    continue;
+                }
                 InetAddress performerAddress = performer.getInetAddress();
                 performer.updateHeartBeat();
                 boolean gossipToSeed = false;
@@ -356,6 +397,15 @@ public class GossipSimulator {
             }
         }
         
+    }
+    
+    public static void startSomeGossipers(List<GossiperStub> gossipers) {
+        for (GossiperStub stub : gossipers) {
+            stub.maybeInitializeLocalState((int) (System.currentTimeMillis() / 1000));
+            stub.prepareInitialState();
+            stub.setBootStrappingStatusState();
+            stub.setRunning(true);
+        }
     }
     
 }

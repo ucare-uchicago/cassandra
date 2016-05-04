@@ -1240,7 +1240,6 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     }
     
     private static void handleStateBootstrapStatic(GossiperStub stub, InetAddress endpoint, String[] pieces) {
-        logger.info("handle bootstrap");
         assert pieces.length >= 2;
 
         // Parse versioned values according to end-point version:
@@ -1405,7 +1404,6 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     }
     
     private static void handleStateNormalStatic(final GossiperStub stub, final InetAddress endpoint, String[] pieces) {
-        logger.info("handle normal");
         assert pieces.length >= 2;
 
         Collection<Token> tokens;
