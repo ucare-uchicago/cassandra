@@ -55,13 +55,14 @@ public class GossipSimulator {
     
     public static final int NUM_TOKENS = 32;
     
-//    private static long cprTime;
     private static final Map<Integer, Long> memoizedTime = new HashMap<Integer, Long>();
 
     public static int numNodes;
     public static int ringSize;
     
     public static GroupedGossiperTask[] gossipTasks;
+    
+    public static boolean added = false;
 
     public static void main(String[] args) throws UnknownHostException {
         if (args.length < 4) {
@@ -131,12 +132,6 @@ public class GossipSimulator {
             gossipTasks[i] = new GroupedGossiperTask(subGroup.get(i));
             gossipSendingWorkers[i].schedule(gossipTasks[i], 0, 1000);
         }
-//        for (InetAddress seedAddr : seeds) {
-//            GossiperStub stub = gossiperGroup.getStub(seedAddr);
-//            stub.setRunning(true);
-//            stub.updateNormalTokens();
-//            stub.setNormalStatusState();
-//        }
         List<GossiperStub> firstHalf = gossiperGroup.getFirstHalf();
         startSomeGossipers(firstHalf);
         try {
@@ -174,6 +169,12 @@ public class GossipSimulator {
         for (GossiperStub stub : firstHalf) {
             stub.setTables(numTables, 1);
         }
+//        try {
+//            Thread.sleep(10000000);
+//        } catch (InterruptedException e1) {
+//            // TODO Auto-generated catch block
+//            e1.printStackTrace();
+//        }
         List<GossiperStub> secondHalf = gossiperGroup.getSecondHalf();
         startSomeGossipers(secondHalf);
         for (GossiperStub stub : secondHalf) {
@@ -181,6 +182,15 @@ public class GossipSimulator {
         }
         Thread clusterMonitor = new Thread(new ClusterMonitor());
         clusterMonitor.start();
+        try {
+            Thread.sleep(GossiperStub.RING_DELAY);
+            for (GossiperStub stub : secondHalf) {
+                stub.updateNormalTokens();
+                stub.setNormalStatusState();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
     
     public RandomTokenGossiperStubGroup getGossiperGroup() {

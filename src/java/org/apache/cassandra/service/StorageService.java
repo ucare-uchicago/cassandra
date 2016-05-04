@@ -1184,13 +1184,14 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     
     private static Collection<Token> getTokensForStatic(GossiperStub stub, InetAddress endpoint)
     {
-        try
-        {
-            return TokenSerializer.deserialize(getPartitioner(), new DataInputStream(new ByteArrayInputStream(getApplicationStateValueStatic(stub, endpoint, ApplicationState.TOKENS))));
-        }
-        catch (IOException e)
-        {
+        try {
+            return TokenSerializer.deserialize(stub.getPartitioner(), new 
+                    DataInputStream(new ByteArrayInputStream(getApplicationStateValueStatic(stub, endpoint, ApplicationState.TOKENS))));
+        } catch (IOException e) {
             throw new RuntimeException(e);
+        } catch (NullPointerException e) {
+            System.out.println(stub + " " + endpoint);
+            return null;
         }
     }
 
