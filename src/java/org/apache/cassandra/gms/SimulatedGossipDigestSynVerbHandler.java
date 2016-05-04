@@ -24,12 +24,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.net.MessageIn;
-import org.apache.cassandra.net.MessageOut;
 import org.apache.cassandra.net.MessagingService;
 
 import edu.uchicago.cs.ucare.cassandra.gms.GossiperStub;
 import edu.uchicago.cs.ucare.cassandra.gms.simulation.GossipSimulator;
-import edu.uchicago.cs.ucare.util.Klogger;
 
 public class SimulatedGossipDigestSynVerbHandler implements IVerbHandler<GossipDigestSyn>
 {
@@ -40,7 +38,7 @@ public class SimulatedGossipDigestSynVerbHandler implements IVerbHandler<GossipD
     {
         InetAddress from = message.from;
         InetAddress to = message.getTo();
-        logger.info("{} receives syn {}", to, from);
+        logger.debug("{} receives syn {}", to, from);
         GossiperStub stub = GossipSimulator.getStub(to);
 //        if (logger.isTraceEnabled())
 //            logger.trace("Received a GossipDigestSynMessage from {}", from);

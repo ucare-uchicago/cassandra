@@ -27,7 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.net.MessageIn;
-import org.apache.cassandra.net.MessageOut;
 import org.apache.cassandra.net.MessagingService;
 
 import edu.uchicago.cs.ucare.cassandra.gms.GossiperStub;
@@ -42,7 +41,7 @@ public class SimulatedGossipDigestAckVerbHandler implements IVerbHandler<GossipD
     {
         InetAddress from = message.from;
         InetAddress to = message.getTo();
-        logger.info("{} receives ack {}", to, from);
+        logger.debug("{} receives ack {}", to, from);
         GossiperStub stub = GossipSimulator.getStub(to);
 //        if (logger.isTraceEnabled())
 //            logger.trace("Received a GossipDigestAckMessage from {}", from);
