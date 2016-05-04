@@ -471,7 +471,7 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
         localState.markDead();
         liveEndpoints.remove(addr);
         unreachableEndpoints.put(addr, System.currentTimeMillis());
-        logger.info("InetAddress {} is now dead.", addr);
+        logger.info("{} thinks {} is now dead.", broadcastAddress, addr);
 //      for (IEndpointStateChangeSubscriber subscriber : subscribers)
 //            subscriber.onDead(addr, localState);
 //        if (logger.isTraceEnabled())

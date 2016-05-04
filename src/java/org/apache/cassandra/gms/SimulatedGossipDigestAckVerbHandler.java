@@ -70,8 +70,9 @@ public class SimulatedGossipDigestAckVerbHandler implements IVerbHandler<GossipD
         {
             InetAddress addr = gDigest.getEndpoint();
             EndpointState localEpStatePtr = Gossiper.getStateForVersionBiggerThanStatic(stub, addr, gDigest.getMaxVersion());
-            if ( localEpStatePtr != null )
-                deltaEpStateMap.put(addr, localEpStatePtr);
+            if ( localEpStatePtr != null ) {
+                deltaEpStateMap.put(addr, localEpStatePtr.copy());
+            }
         }
 
 //        MessageOut<GossipDigestAck2> gDigestAck2Message = 

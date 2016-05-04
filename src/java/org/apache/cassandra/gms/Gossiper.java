@@ -1271,10 +1271,8 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     }
     
     static void examineGossiperStatic(GossiperStub stub, List<GossipDigest> gDigestList, 
-            List<GossipDigest> deltaGossipDigestList, Map<InetAddress, EndpointState> deltaEpStateMap)
-    {
-        for ( GossipDigest gDigest : gDigestList )
-        {
+            List<GossipDigest> deltaGossipDigestList, Map<InetAddress, EndpointState> deltaEpStateMap) {
+        for ( GossipDigest gDigest : gDigestList ) {
             int remoteGeneration = gDigest.getGeneration();
             int maxRemoteVersion = gDigest.getMaxVersion();
             /* Get state associated with the end point in digest */
@@ -1284,26 +1282,20 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
                 then we follow the "if" path of the logic. If we have absolutely nothing for this endpoint we need to
                 request all the data for this endpoint.
             */
-            if ( epStatePtr != null )
-            {
+            if ( epStatePtr != null ) {
                 int localGeneration = epStatePtr.getHeartBeatState().getGeneration();
                 /* get the max version of all keys in the state associated with this endpoint */
                 int maxLocalVersion = getMaxEndpointStateVersion(epStatePtr);
                 if ( remoteGeneration == localGeneration && maxRemoteVersion == maxLocalVersion )
                     continue;
 
-                if ( remoteGeneration > localGeneration )
-                {
+                if ( remoteGeneration > localGeneration ) {
                     /* we request everything from the gossiper */
                     requestAll(gDigest, deltaGossipDigestList, remoteGeneration);
-                }
-                else if ( remoteGeneration < localGeneration )
-                {
+                } else if ( remoteGeneration < localGeneration ) {
                     /* send all data with generation = localgeneration and version > 0 */
                     sendAllStatic(stub, gDigest, deltaEpStateMap, 0);
-                }
-                else if ( remoteGeneration == localGeneration )
-                {
+                } else if ( remoteGeneration == localGeneration ) {
                     /*
                         If the max remote version is greater then we request the remote endpoint send us all the data
                         for this endpoint with version greater than the max version number we have locally for this
@@ -1311,19 +1303,14 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
                         If the max remote version is lesser, then we send all the data we have locally for this endpoint
                         with version greater than the max remote version.
                     */
-                    if ( maxRemoteVersion > maxLocalVersion )
-                    {
+                    if ( maxRemoteVersion > maxLocalVersion ) {
                         deltaGossipDigestList.add( new GossipDigest(gDigest.getEndpoint(), remoteGeneration, maxLocalVersion) );
-                    }
-                    else if ( maxRemoteVersion < maxLocalVersion )
-                    {
+                    } else if ( maxRemoteVersion < maxLocalVersion ) {
                         /* send all data with generation = localgeneration and version > maxRemoteVersion */
                         sendAllStatic(stub, gDigest, deltaEpStateMap, maxRemoteVersion);
                     }
                 }
-            }
-            else
-            {
+            } else {
                 /* We are here since we have no data for this endpoint locally so request everything. */
                 requestAll(gDigest, deltaGossipDigestList, remoteGeneration);
             }
