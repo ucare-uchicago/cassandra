@@ -1277,8 +1277,11 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         stub.getTokenMetadata().addBootstrapTokens(tokens, endpoint);
         calculatePendingRangesStatic(stub);
 
-        if (Gossiper.usesHostIdStatic(stub, endpoint))
-            stub.getTokenMetadata().updateHostId(Gossiper.getHostIdStatic(stub, endpoint), endpoint);
+        if (Gossiper.usesHostIdStatic(stub, endpoint)) {
+            if (stub.getEndpointStateMap().get(endpoint) != null) {
+                stub.getTokenMetadata().updateHostId(Gossiper.getHostIdStatic(stub, endpoint), endpoint);
+            }
+        }
     }
 
     /**
@@ -1425,8 +1428,11 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
             logger.info("Node " + endpoint + " state jump to normal");
 
         // Order Matters, TM.updateHostID() should be called before TM.updateNormalToken(), (see CASSANDRA-4300).
-        if (Gossiper.usesHostIdStatic(stub, endpoint))
-            stub.getTokenMetadata().updateHostId(Gossiper.getHostIdStatic(stub, endpoint), endpoint);
+        if (Gossiper.usesHostIdStatic(stub, endpoint)) {
+            if (stub.getEndpointStateMap().get(endpoint) != null) {
+                stub.getTokenMetadata().updateHostId(Gossiper.getHostIdStatic(stub, endpoint), endpoint);
+            }
+        }
 
         Set<Token> tokensToUpdateInMetadata = new HashSet<Token>();
 //        Set<Token> tokensToUpdateInSystemTable = new HashSet<Token>();
