@@ -108,6 +108,14 @@ public class EndpointState
     {
         isAlive = false;
     }
+    
+    public EndpointState copy() {
+        EndpointState epState = new EndpointState(hbState.copy());
+        for (ApplicationState appState : applicationState.keySet()) {
+            epState.applicationState.put(appState, applicationState.get(appState));
+        }
+        return epState;
+    }
 }
 
 class EndpointStateSerializer implements IVersionedSerializer<EndpointState>

@@ -75,6 +75,10 @@ public class GossipDigest implements Comparable<GossipDigest>
         sb.append(maxVersion);
         return sb.toString();
     }
+    
+    public GossipDigest copy() {
+        return new GossipDigest(endpoint, generation, maxVersion);
+    }
 }
 
 class GossipDigestSerializer implements IVersionedSerializer<GossipDigest>

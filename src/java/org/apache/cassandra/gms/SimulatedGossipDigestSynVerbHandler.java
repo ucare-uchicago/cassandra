@@ -84,7 +84,6 @@ public class SimulatedGossipDigestSynVerbHandler implements IVerbHandler<GossipD
         List<GossipDigest> deltaGossipDigestList = new ArrayList<GossipDigest>();
         Map<InetAddress, EndpointState> deltaEpStateMap = new HashMap<InetAddress, EndpointState>();
         Gossiper.examineGossiperStatic(stub, gDigestList, deltaGossipDigestList, deltaEpStateMap);
-        logger.info("syn digest {} deltadigest {} delta " + deltaEpStateMap, gDigestList, deltaGossipDigestList);
 
 //        MessageOut<GossipDigestAck> gDigestAckMessage = 
 //                new MessageOut<GossipDigestAck>(MessagingService.Verb.GOSSIP_DIGEST_ACK,

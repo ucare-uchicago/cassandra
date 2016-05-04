@@ -182,10 +182,11 @@ public class GossipSimulator {
 
                 if (gDigests.size() > 0) {
                     MessageIn synMsg = null;
-                    synMsg = performer.genGossipDigestSyncMsgIn();
+//                    synMsg = performer.genGossipDigestSyncMsgIn();
                     if (!liveEndpoints.isEmpty()) {
                         InetAddress liveReceiver = getRandomAddress(liveEndpoints);
                         gossipToSeed = seeds.contains(liveReceiver);
+                        synMsg = performer.genGossipDigestSyncMsgIn();
                         synMsg.setTo(liveReceiver);
                         if (!msgQueues.get(liveReceiver).add(synMsg)) {
                             Klogger.scale.error("Cannot add more message to message queue of " + liveReceiver);
@@ -197,6 +198,7 @@ public class GossipSimulator {
                         if (prob > random.nextDouble()) {
                             InetAddress unreachableReceiver = getRandomAddress(unreachableEndpoints.keySet());
                             if (unreachableReceiver != null) {
+                                synMsg = performer.genGossipDigestSyncMsgIn();
                                 synMsg.setTo(unreachableReceiver);
                                 if (!msgQueues.get(unreachableReceiver).add(synMsg)) {
                                     Klogger.scale.error("Cannot add more message to message queue of " + unreachableReceiver);
@@ -212,6 +214,7 @@ public class GossipSimulator {
                             } else {
                                 if (liveEndpoints.size() == 0) {
                                     InetAddress seed = getRandomAddress(seeds);
+                                    synMsg = performer.genGossipDigestSyncMsgIn();
                                     synMsg.setTo(seed);
                                     if (!msgQueues.get(seed).add(synMsg)) {
                                         Klogger.scale.error("Cannot add more message to message queue of " + seed);
@@ -221,6 +224,7 @@ public class GossipSimulator {
                                     double randDbl = random.nextDouble();
                                     if (randDbl <= probability) {
                                         InetAddress seed = getRandomAddress(seeds);
+                                        synMsg = performer.genGossipDigestSyncMsgIn();
                                         synMsg.setTo(seed);
                                         if (!msgQueues.get(seed).add(synMsg)) {
                                             Klogger.scale.error("Cannot add more message to message queue of " + seed);

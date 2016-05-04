@@ -62,6 +62,10 @@ public class HeartBeatState
     {
         generation += 1;
     }
+    
+    public HeartBeatState copy() {
+        return new HeartBeatState(generation, version);
+    }
 }
 
 class HeartBeatStateSerializer implements IVersionedSerializer<HeartBeatState>

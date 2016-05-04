@@ -77,7 +77,6 @@ public class SimulatedGossipDigestAckVerbHandler implements IVerbHandler<GossipD
 //        MessageOut<GossipDigestAck2> gDigestAck2Message = 
 //                new MessageOut<GossipDigestAck2>(MessagingService.Verb.GOSSIP_DIGEST_ACK2,
 //                     new GossipDigestAck2(deltaEpStateMap), GossipDigestAck2.serializer);
-        logger.info("digest {} delta {} delta " + deltaEpStateMap, gDigestList, epStateMap);
         MessageIn<GossipDigestAck2> ack2MessageIn = MessageIn.create(to, new GossipDigestAck2(deltaEpStateMap), 
                 emptyMap, MessagingService.Verb.GOSSIP_DIGEST_ACK2, MessagingService.VERSION_12);
         ack2MessageIn.setTo(from);

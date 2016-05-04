@@ -681,7 +681,6 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     
     public static UUID getHostIdStatic(GossiperStub stub, InetAddress endpoint)
     {
-        System.out.println(stub + " " + endpoint);
         if (!usesHostIdStatic(stub, endpoint))
             throw new RuntimeException("Host " + endpoint + " does not use new-style tokens!");
         return UUID.fromString(stub.getEndpointStateMap().get(endpoint).getApplicationState(ApplicationState.HOST_ID).value);
@@ -865,18 +864,15 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
          * If the local endpoint state exists then report to the FD only
          * if the versions workout.
         */
-        if ( localEndpointState != null )
-        {
-            IFailureDetector fd = FailureDetector.instance;
+        if ( localEndpointState != null ) {
+            IFailureDetector fd = stub.getFailureDetector();
             int localGeneration = localEndpointState.getHeartBeatState().getGeneration();
             int remoteGeneration = remoteEndpointState.getHeartBeatState().getGeneration();
-            if ( remoteGeneration > localGeneration )
-            {
+            if ( remoteGeneration > localGeneration ) {
                 localEndpointState.updateTimestamp();
                 // this node was dead and the generation changed, this indicates a reboot, or possibly a takeover
                 // we will clean the fd intervals for it and relearn them
-                if (!localEndpointState.isAlive())
-                {
+                if (!localEndpointState.isAlive()) {
                     logger.debug("Clearing interval times for {} due to generation change", endpoint);
                     fd.clear(endpoint);
                 }
@@ -884,12 +880,10 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
                 return;
             }
 
-            if ( remoteGeneration == localGeneration )
-            {
+            if ( remoteGeneration == localGeneration ) {
                 int localVersion = getMaxEndpointStateVersion(localEndpointState);
                 int remoteVersion = remoteEndpointState.getHeartBeatState().getHeartBeatVersion();
-                if ( remoteVersion > localVersion )
-                {
+                if ( remoteVersion > localVersion ) {
                     localEndpointState.updateTimestamp();
                     // just a version change, report to the fd
                     fd.report(endpoint);
@@ -1073,15 +1067,12 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
         }
     }
     
-    static void applyStateLocallyStatic(GossiperStub stub, Map<InetAddress, EndpointState> epStateMap)
-    {
-        for (Entry<InetAddress, EndpointState> entry : epStateMap.entrySet())
-        {
+    static void applyStateLocallyStatic(GossiperStub stub, Map<InetAddress, EndpointState> epStateMap) {
+        for (Entry<InetAddress, EndpointState> entry : epStateMap.entrySet()) {
             InetAddress ep = entry.getKey();
-            if ( ep.equals(FBUtilities.getBroadcastAddress()))
+            if ( ep.equals(stub.getInetAddress()))
                 continue;
-            if (stub.getJustRemovedEndpoints().containsKey(ep))
-            {
+            if (stub.getJustRemovedEndpoints().containsKey(ep)) {
                 if (logger.isTraceEnabled())
                     logger.trace("Ignoring gossip for " + ep + " because it is quarantined");
                 continue;
@@ -1093,27 +1084,22 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
                 If state does not exist just add it. If it does then add it if the remote generation is greater.
                 If there is a generation tie, attempt to break it by heartbeat version.
             */
-            if ( localEpStatePtr != null )
-            {
+            if ( localEpStatePtr != null ) {
                 int localGeneration = localEpStatePtr.getHeartBeatState().getGeneration();
                 int remoteGeneration = remoteState.getHeartBeatState().getGeneration();
                 if (logger.isTraceEnabled())
                     logger.trace(ep + "local generation " + localGeneration + ", remote generation " + remoteGeneration);
 
-                if (remoteGeneration > localGeneration)
-                {
+                if (remoteGeneration > localGeneration) {
                     if (logger.isTraceEnabled())
                         logger.trace("Updating heartbeat state generation to " + remoteGeneration + " from " + localGeneration + " for " + ep);
                     // major state change will handle the update by inserting the remote state directly
                     handleMajorStateChangeStatic(stub, ep, remoteState);
-                }
-                else if ( remoteGeneration == localGeneration ) // generation has not changed, apply new states
-                {
+                } else if ( remoteGeneration == localGeneration ) { // generation has not changed, apply new states
                     /* find maximum state */
                     int localMaxVersion = getMaxEndpointStateVersion(localEpStatePtr);
                     int remoteMaxVersion = getMaxEndpointStateVersion(remoteState);
-                    if ( remoteMaxVersion > localMaxVersion )
-                    {
+                    if ( remoteMaxVersion > localMaxVersion ) {
                         // apply states, but do not notify since there is no major change
                         applyNewStatesStatic(stub, ep, localEpStatePtr, remoteState);
                     }
@@ -1121,17 +1107,13 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
                             logger.trace("Ignoring remote version " + remoteMaxVersion + " <= " + localMaxVersion + " for " + ep);
                     if (!localEpStatePtr.isAlive() && !stub.isDeadState(localEpStatePtr)) // unless of course, it was dead
                         stub.markAlive(ep, localEpStatePtr);
-                }
-                else
-                {
+                } else {
                     if (logger.isTraceEnabled())
                         logger.trace("Ignoring remote generation " + remoteGeneration + " < " + localGeneration);
                 }
-            }
-            else
-            {
+            } else {
                 // this is a new node, report it to the FD in case it is the first time we are seeing it AND it's not alive
-                FailureDetector.instance.report(ep);
+                stub.getFailureDetector().report(ep);
                 handleMajorStateChangeStatic(stub, ep, remoteState);
             }
         }
@@ -1222,7 +1204,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     private static void sendAllStatic(GossiperStub stub, GossipDigest gDigest, Map<InetAddress, EndpointState> deltaEpStateMap, int maxRemoteVersion) {
         EndpointState localEpStatePtr = getStateForVersionBiggerThanStatic(stub, gDigest.getEndpoint(), maxRemoteVersion) ;
         if ( localEpStatePtr != null )
-            deltaEpStateMap.put(gDigest.getEndpoint(), localEpStatePtr);
+            deltaEpStateMap.put(gDigest.getEndpoint(), localEpStatePtr.copy());
     }
 
     /*
