@@ -60,7 +60,7 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
     };
     private static final Logger logger = LoggerFactory.getLogger(GossiperStub.class);
     
-    public static final int RING_DELAY = 30 * 1000; 
+    public static final int RING_DELAY = 15 * 1000; 
     public final static int QUARANTINE_DELAY = RING_DELAY * 2;
     public final static long FatClientTimeout = (long) (RING_DELAY);
     public long aVeryLongTime = 259200 * 1000;
@@ -159,6 +159,7 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
         state.addApplicationState(ApplicationState.NET_VERSION, versionedValueFactory.networkVersion());
         state.addApplicationState(ApplicationState.RPC_ADDRESS, versionedValueFactory.rpcaddress(broadcastAddress));
         state.addApplicationState(ApplicationState.RELEASE_VERSION, versionedValueFactory.releaseVersion());
+        state.addApplicationState(ApplicationState.TOKENS, versionedValueFactory.tokens(tokens));
     }
     
     public void updateNormalTokens() {
@@ -493,7 +494,8 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
 
                 // check if this is a fat client. fat clients are removed automatically from
                 // gossip after FatClientTimeout.  Do not remove dead states here.
-                if (!isDeadState(epState) && !epState.isAlive() && !tokenMetadata.isMember(endpoint) && !justRemovedEndpoints.containsKey(endpoint) && (duration > FatClientTimeout)) {
+                if (!isDeadState(epState) && !epState.isAlive() && !tokenMetadata.isMember(endpoint) 
+                        && !justRemovedEndpoints.containsKey(endpoint) && (duration > FatClientTimeout)) {
                     logger.info("FatClient " + endpoint + " has been silent for " + FatClientTimeout + "ms, removing from gossip");
                     removeEndpoint(endpoint); // will put it in justRemovedEndpoints to respect quarantine delay
                     evictFromMembership(endpoint); // can get rid of the state immediately

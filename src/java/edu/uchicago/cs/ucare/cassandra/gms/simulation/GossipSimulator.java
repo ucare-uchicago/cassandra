@@ -20,7 +20,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.RandomPartitioner;
 import org.apache.cassandra.gms.EndpointState;
 import org.apache.cassandra.gms.GossipDigest;
@@ -107,7 +106,7 @@ public class GossipSimulator {
         numGossipSendingWorker = numGossipSendingWorker < 1 ? 1 : numGossipSendingWorker;
         Set<InetAddress> seeds = new HashSet<InetAddress>();
         seeds.add(InetAddress.getByName("127.0.0.1"));
-        gossiperGroup = new RandomTokenGossiperStubGroup(CLUSTER_NAME, "datacenter1", numNodes, seeds, new Murmur3Partitioner(), 32);
+        gossiperGroup = new RandomTokenGossiperStubGroup(CLUSTER_NAME, "datacenter1", numNodes, seeds, new RandomPartitioner(), 32);
         gossiperGroup.setTables(numTables, 1);
         msgQueues = new HashMap<InetAddress, LinkedBlockingQueue<MessageIn>>();
         Klogger.scale.info("Starting worker threads");
@@ -123,8 +122,6 @@ public class GossipSimulator {
             stub.maybeInitializeLocalState((int) (System.currentTimeMillis() / 1000));
             stub.prepareInitialState();
             stub.setBootStrappingStatusState();
-//            stub.updateNormalTokens();
-//            stub.setNormalStatusState();
             subGroup.get(x).add(stub);
             x = (x + 1) % numGossipSendingWorker;
         }
@@ -137,6 +134,15 @@ public class GossipSimulator {
         }
         Thread clusterMonitor = new Thread(new ClusterMonitor());
         clusterMonitor.start();
+        try {
+            Thread.sleep(GossiperStub.RING_DELAY);
+            for (GossiperStub stub : gossiperGroup) {
+                stub.updateNormalTokens();
+                stub.setNormalStatusState();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
     
     public RandomTokenGossiperStubGroup getGossiperGroup() {

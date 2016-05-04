@@ -1240,6 +1240,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     }
     
     private static void handleStateBootstrapStatic(GossiperStub stub, InetAddress endpoint, String[] pieces) {
+        logger.info("handle bootstrap");
         assert pieces.length >= 2;
 
         // Parse versioned values according to end-point version:
@@ -1404,6 +1405,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     }
     
     private static void handleStateNormalStatic(final GossiperStub stub, final InetAddress endpoint, String[] pieces) {
+        logger.info("handle normal");
         assert pieces.length >= 2;
 
         Collection<Token> tokens;
@@ -1725,7 +1727,10 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     
     private static void calculatePendingRangesStatic(GossiperStub stub) {
         for (String table : stub.getTables()) {
-            calculatePendingRanges(stub.getStrategy(table), table);
+            long time = System.currentTimeMillis();
+            simulatedCalculatePendingRanges(stub, stub.getStrategy(table), table);
+            time = System.currentTimeMillis() - time;
+            logger.info("cpr took {} ms", time);
         }
     }
 
@@ -1857,13 +1862,13 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 
         // For each of the bootstrapping nodes, simply add and remove them one by one to
         // allLeftMetadata and check in between what their ranges would be.
-        for (InetAddress endpoint : bootstrapTokens.inverse().keySet())
-        {
+        for (InetAddress endpoint : bootstrapTokens.inverse().keySet()) {
             Collection<Token> tokens = bootstrapTokens.inverse().get(endpoint);
             
             allLeftMetadata.updateNormalTokens(tokens, endpoint);
-            for (Range<Token> range : strategy.simulatedGetAddressRanges(allLeftMetadata).get(endpoint))
-                pendingRanges.put(range, endpoint);
+            strategy.simulatedGetAddressRanges(allLeftMetadata);
+//            for (Range<Token> range : strategy.simulatedGetAddressRanges(allLeftMetadata).get(endpoint))
+//                pendingRanges.put(range, endpoint);
             allLeftMetadata.removeEndpoint(endpoint);
         }
 
