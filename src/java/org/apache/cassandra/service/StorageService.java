@@ -2136,7 +2136,10 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 
     public static void onRemoveStatic(GossiperStub stub, InetAddress endpoint) {
         stub.getTokenMetadata().removeEndpoint(endpoint);
-//        calculatePendingRanges();
+        long time = System.currentTimeMillis();
+        calculatePendingRangesStatic(stub);
+        time = System.currentTimeMillis() - time;
+        logger.info("cpr on remove {} ms", time);
     }
 
     public void onDead(InetAddress endpoint, EndpointState state)
