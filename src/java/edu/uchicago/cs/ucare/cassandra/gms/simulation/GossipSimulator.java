@@ -179,7 +179,8 @@ public class GossipSimulator {
         try {
             Klogger.scale.info("Starting second half");
             startSomeGossipers(secondHalf);
-            Thread.sleep(GossiperStub.RING_DELAY);
+//            Thread.sleep(GossiperStub.RING_DELAY);
+            Thread.sleep(5000);
             for (GossiperStub stub : secondHalf) {
                 stub.setTables(numTables, 1);
             }
@@ -366,7 +367,12 @@ public class GossipSimulator {
 //    }
     
     public static long getMemoizedTime(int size) {
-        return memoizedTime.get(size);
+        Long time = memoizedTime.get(size);
+        if (time == null) {
+            System.out.println(size);
+        }
+//        return size == 0 ? 0 : memoizedTime.get(size);
+        return time == null ? 10 : time;
     }
     
     public static boolean isRingStable() {
@@ -394,11 +400,6 @@ public class GossipSimulator {
                 for (GossiperStub stub : gossiperGroup) {
                     totalAccuDown += stub.getAccuDown();
                 }
-//                double sendLateness = 0;
-//                for (GroupedGossiperTask gossipTask : gossipTasks) {
-//                    sendLateness += gossipTask.averageInterval();
-//                }
-//                sendLateness /= gossipTasks.length;
                 Klogger.scale.info("Ring: stable {} accuDown {}", allRingComplete, totalAccuDown);
                 try {
                     Thread.sleep(2000);
