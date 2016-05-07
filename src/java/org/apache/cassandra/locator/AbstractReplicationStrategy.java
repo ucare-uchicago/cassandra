@@ -25,6 +25,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 
 import edu.uchicago.cs.ucare.cassandra.gms.simulation.GossipSimulator;
+import edu.uchicago.cs.ucare.util.StackTracePrinter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,16 +147,21 @@ public abstract class AbstractReplicationStrategy
      */
     public Multimap<InetAddress, Range<Token>> getAddressRanges(TokenMetadata metadata)
     {
+        long elTime = System.currentTimeMillis();
         Multimap<InetAddress, Range<Token>> map = HashMultimap.create();
 
+        int i = 0;
         for (Token token : metadata.sortedTokens())
         {
+            i++;
             Range<Token> range = metadata.getPrimaryRangeFor(token);
             for (InetAddress ep : calculateNaturalEndpoints(token, metadata))
             {
                 map.put(ep, range);
             }
         }
+        elTime = System.currentTimeMillis() - elTime;
+        logger.info("gAR for {} took {} ms", i, elTime);
 
         return map;
     }
@@ -164,6 +170,8 @@ public abstract class AbstractReplicationStrategy
         try {
             long sleepTime = GossipSimulator.getMemoizedTime(metadata.getSize());
             Thread.sleep(sleepTime);
+            logger.info("gar sleep for {}", sleepTime);
+            StackTracePrinter.print();
         } catch (InterruptedException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();

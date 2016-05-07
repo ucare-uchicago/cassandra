@@ -187,8 +187,8 @@ public class GossipSimulator {
         try {
             Klogger.scale.info("Starting second half");
             startSomeGossipers(secondHalf);
-//            Thread.sleep(GossiperStub.RING_DELAY);
-            Thread.sleep(5000);
+            Thread.sleep(GossiperStub.RING_DELAY);
+//            Thread.sleep(5000);
             for (GossiperStub stub : secondHalf) {
                 stub.setTables(numTables, 1);
             }

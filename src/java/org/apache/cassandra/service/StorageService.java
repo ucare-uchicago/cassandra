@@ -37,6 +37,7 @@ import static com.google.common.base.Charsets.ISO_8859_1;
 import com.google.common.collect.*;
 
 import edu.uchicago.cs.ucare.cassandra.gms.GossiperStub;
+import edu.uchicago.cs.ucare.util.StackTracePrinter;
 
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.log4j.Level;
@@ -1730,12 +1731,15 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
      */
     private void calculatePendingRanges()
     {
+        long elTime = System.currentTimeMillis();
         for (String table : Schema.instance.getNonSystemTables()) {
             long time = System.currentTimeMillis();
             calculatePendingRanges(Table.open(table).getReplicationStrategy(), table);
             time = System.currentTimeMillis() - time;
-            logger.info("cpr took {} ms", time);
+            logger.info("cpr for {} took {} ms", table, time);
         }
+        elTime = System.currentTimeMillis() - elTime;
+        logger.info("cpr took {} ms", elTime);
     }
     
     private static void calculatePendingRangesStatic(GossiperStub stub) {
@@ -1744,10 +1748,13 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
             long time = System.currentTimeMillis();
             simulatedCalculatePendingRanges(stub, stub.getStrategy(table), table);
             time = System.currentTimeMillis() - time;
-            logger.debug("cpr for {} took {} ms", table, time);
+            logger.info("cpr for {} took {} ms", table, time);
         }
         elTime = System.currentTimeMillis() - elTime;
-        logger.info("cpr took {} ms", elTime);
+        if (elTime > 2) {
+            logger.info("cpr took {} ms", elTime);
+            StackTracePrinter.print();
+        }
     }
 
     // public & static for testing purposes
@@ -1842,6 +1849,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     }
     
     public static void simulatedCalculatePendingRanges(GossiperStub stub, AbstractReplicationStrategy strategy, String table) {
+        System.out.println(stub + " " + strategy + " " + table);
         TokenMetadata tm = stub.getTokenMetadata();
         Multimap<Range<Token>, InetAddress> pendingRanges = HashMultimap.create();
         BiMultiValMap<Token, InetAddress> bootstrapTokens = tm.getBootstrapTokens();
