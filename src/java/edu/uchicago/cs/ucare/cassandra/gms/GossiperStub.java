@@ -61,7 +61,7 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
     };
     private static final Logger logger = LoggerFactory.getLogger(GossiperStub.class);
     
-    public static final int RING_DELAY = 15 * 1000; 
+    public static final int RING_DELAY = 30 * 1000; 
     public final static int QUARANTINE_DELAY = RING_DELAY * 2;
     public final static long FatClientTimeout = (long) (RING_DELAY);
     public long aVeryLongTime = 259200 * 1000;

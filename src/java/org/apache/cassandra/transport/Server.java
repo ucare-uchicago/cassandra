@@ -206,15 +206,17 @@ public class Server implements CassandraDaemon.Server
             this.server = server;
         }
 
-        public void onJoin(InetAddress endpoint, EndpointState epState)
+        public int[] onJoin(InetAddress endpoint, EndpointState epState)
         {
             // TODO: we don't gossip the native protocol ip/port yet, so use the
             // endpoint address and ip on which this server is listening instead.
             server.connectionTracker.send(Event.TopologyChange.newNode(endpoint, server.socket.getPort()));
+            return new int[] { 0, 0 };
         }
 
-        public void onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
+        public int[] onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
         {
+            return new int[] { 0, 0 };
         }
 
         public void onAlive(InetAddress endpoint, EndpointState state)

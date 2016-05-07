@@ -51,11 +51,12 @@ public class GossipDigestAckVerbHandler implements IVerbHandler<GossipDigestAck>
         List<GossipDigest> gDigestList = gDigestAckMessage.getGossipDigestList();
         Map<InetAddress, EndpointState> epStateMap = gDigestAckMessage.getEndpointStateMap();
 
+        int result[] = { 0, 0 };
         if ( epStateMap.size() > 0 )
         {
             /* Notify the Failure Detector */
             Gossiper.instance.notifyFailureDetector(epStateMap);
-            Gossiper.instance.applyStateLocally(epStateMap);
+            result = Gossiper.instance.applyStateLocally(epStateMap);
         }
 
         /* Get the state required to send to this gossipee - construct GossipDigestAck2Message */
@@ -75,6 +76,10 @@ public class GossipDigestAckVerbHandler implements IVerbHandler<GossipDigestAck>
             logger.trace("Sending a GossipDigestAck2Message to {}", from);
         MessagingService.instance().sendOneWay(gDigestAck2Message, from);
         elTime = System.currentTimeMillis() - elTime;
-        logger.info("ack took {} ms", elTime);
+        int boot = result[0];
+        int normal = result[1];
+        if (boot != 0 || normal != 0) {
+            logger.info("{} executes ack took {} ms ; boot " + boot + " normal " + normal, from, elTime);
+        }
     }
 }

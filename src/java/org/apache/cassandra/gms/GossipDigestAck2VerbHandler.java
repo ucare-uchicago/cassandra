@@ -33,16 +33,20 @@ public class GossipDigestAck2VerbHandler implements IVerbHandler<GossipDigestAck
     public void doVerb(MessageIn<GossipDigestAck2> message, String id)
     {
         long elTime = System.currentTimeMillis();
+        InetAddress from = message.from;
         if (logger.isTraceEnabled())
         {
-            InetAddress from = message.from;
             logger.trace("Received a GossipDigestAck2Message from {}", from);
         }
         Map<InetAddress, EndpointState> remoteEpStateMap = message.payload.getEndpointStateMap();
         /* Notify the Failure Detector */
         Gossiper.instance.notifyFailureDetector(remoteEpStateMap);
-        Gossiper.instance.applyStateLocally(remoteEpStateMap);
+        int[] result =Gossiper.instance.applyStateLocally(remoteEpStateMap);
         elTime = System.currentTimeMillis() - elTime;
-        logger.info("ack2 took {} ms", elTime);
+        int boot = result[0];
+        int normal = result[1];
+        if (boot != 0 || normal != 0) {
+            logger.info("{} executes ack took {} ms ; boot " + boot + " normal " + normal, from, elTime);
+        }
     }
 }

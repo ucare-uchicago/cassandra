@@ -274,10 +274,10 @@ public class RangeStreamer implements IEndpointStateChangeSubscriber, IFailureDe
     }
     
     @Override
-    public void onJoin(InetAddress endpoint, EndpointState epState) {}
+    public int[] onJoin(InetAddress endpoint, EndpointState epState) {return new int[] {0, 0}; }
 
     @Override
-    public void onChange(InetAddress endpoint, ApplicationState state, VersionedValue value) {}
+    public int[] onChange(InetAddress endpoint, ApplicationState state, VersionedValue value) {return new int[] {0, 0}; }
 
     @Override
     public void onAlive(InetAddress endpoint, EndpointState state) {}

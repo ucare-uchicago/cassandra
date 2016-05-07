@@ -1100,8 +1100,9 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
      * Note: Any time a node state changes from STATUS_NORMAL, it will not be visible to new nodes. So it follows that
      * you should never bootstrap a new node during a removetoken, decommission or move.
      */
-    public void onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
+    public int[] onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
     {
+        int result[] = { 0, 0 };
         switch (state)
         {
             case STATUS:
@@ -1111,11 +1112,13 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 
                 String moveName = pieces[0];
 
-                if (moveName.equals(VersionedValue.STATUS_BOOTSTRAPPING))
+                if (moveName.equals(VersionedValue.STATUS_BOOTSTRAPPING)) {
                     handleStateBootstrap(endpoint, pieces);
-                else if (moveName.equals(VersionedValue.STATUS_NORMAL))
+                    result[0] += 1;
+                } else if (moveName.equals(VersionedValue.STATUS_NORMAL)) {
                     handleStateNormal(endpoint, pieces);
-                else if (moveName.equals(VersionedValue.REMOVING_TOKEN) || moveName.equals(VersionedValue.REMOVED_TOKEN))
+                    result[1] += 1;
+                } else if (moveName.equals(VersionedValue.REMOVING_TOKEN) || moveName.equals(VersionedValue.REMOVED_TOKEN))
                     handleStateRemoving(endpoint, pieces);
                 else if (moveName.equals(VersionedValue.STATUS_LEAVING))
                     handleStateLeaving(endpoint, pieces);
@@ -1126,10 +1129,12 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
                 else if (moveName.equals(VersionedValue.STATUS_RELOCATING))
                     handleStateRelocating(endpoint, pieces);
         }
+        return result;
     }
     
-    public static void onChangeStatic(GossiperStub stub, InetAddress endpoint, 
+    public static int[] onChangeStatic(GossiperStub stub, InetAddress endpoint, 
             ApplicationState state, VersionedValue value) {
+        int[] result = { 0, 0 };
         switch (state) {
             case STATUS:
                 String apStateValue = value.value;
@@ -1140,8 +1145,10 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 
                 if (moveName.equals(VersionedValue.STATUS_BOOTSTRAPPING)) {
                     handleStateBootstrapStatic(stub, endpoint, pieces);
+                    result[0] = result[0] + 1;
                 } else if (moveName.equals(VersionedValue.STATUS_NORMAL)) {
                     handleStateNormalStatic(stub, endpoint, pieces);
+                    result[1] = result[1] + 1;
                 } else if (moveName.equals(VersionedValue.REMOVING_TOKEN) || moveName.equals(VersionedValue.REMOVED_TOKEN)) {
                     throw new UnsupportedOperationException("This should not be called in CA-3881 workload");
 //                    handleStateRemoving(endpoint, pieces);
@@ -1159,6 +1166,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 //                    handleStateRelocating(endpoint, pieces);
                 }
         }
+        return result;
     }
 
     private byte[] getApplicationStateValue(InetAddress endpoint, ApplicationState appstate)
@@ -2108,20 +2116,29 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         return changedRanges;
     }
 
-    public void onJoin(InetAddress endpoint, EndpointState epState)
+    public int[] onJoin(InetAddress endpoint, EndpointState epState)
     {
+        int result[] = { 0, 0 };
         for (Map.Entry<ApplicationState, VersionedValue> entry : epState.getApplicationStateMap().entrySet())
         {
-            onChange(endpoint, entry.getKey(), entry.getValue());
+            int[] tmp = onChange(endpoint, entry.getKey(), entry.getValue());
+            for (int i = 0; i < result.length; ++i) {
+                result[i] += tmp[i];
+            }
         }
+        return result;
     }
     
-    public static void onJoinStatic(GossiperStub stub, InetAddress endpoint, EndpointState epState)
+    public static int[] onJoinStatic(GossiperStub stub, InetAddress endpoint, EndpointState epState)
     {
-        for (Map.Entry<ApplicationState, VersionedValue> entry : epState.getApplicationStateMap().entrySet())
-        {
-            onChangeStatic(stub, endpoint, entry.getKey(), entry.getValue());
+        int result[] = { 0, 0 };
+        for (Map.Entry<ApplicationState, VersionedValue> entry : epState.getApplicationStateMap().entrySet()) {
+            int[] tmp = onChangeStatic(stub, endpoint, entry.getKey(), entry.getValue());
+            for (int i = 0; i < result.length; ++i) {
+                result[i] += tmp[i];
+            }
         }
+        return result;
     }
 
     public void onAlive(InetAddress endpoint, EndpointState state)
@@ -2144,10 +2161,10 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 
     public static void onRemoveStatic(GossiperStub stub, InetAddress endpoint) {
         stub.getTokenMetadata().removeEndpoint(endpoint);
-        long time = System.currentTimeMillis();
-        calculatePendingRangesStatic(stub);
-        time = System.currentTimeMillis() - time;
-        logger.info("cpr on remove {} ms", time);
+//        long time = System.currentTimeMillis();
+//        calculatePendingRangesStatic(stub);
+//        time = System.currentTimeMillis() - time;
+//        logger.info("cpr on remove {} ms", time);
     }
 
     public void onDead(InetAddress endpoint, EndpointState state)
