@@ -392,13 +392,13 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
         this.partitioner = partitioner;
     }
     
-//    public Token<?> getToken() {
-//        return token;
-//    }
-//
-//    public void setToken(Token<?> token) {
-//        this.token = token;
-//    }
+    public Collection<Token> getTokens() {
+        return tokens;
+    }
+
+    public void setTokens(Collection<Token> tokens) {
+        this.tokens = tokens;
+    }
 
     public String getPartitionerName() {
         return partitionerName;
