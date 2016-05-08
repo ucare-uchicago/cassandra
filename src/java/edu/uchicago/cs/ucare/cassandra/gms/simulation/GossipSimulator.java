@@ -63,7 +63,7 @@ public class GossipSimulator {
     public static int numNodes;
     public static int ringSize;
     
-//    public static GroupedGossiperTask[] gossipTasks;
+    public static GroupedGossiperTask[] gossipTasks;
     
     public static ScheduledExecutorService gossiperExecutors;
     
@@ -130,16 +130,15 @@ public class GossipSimulator {
             t.start();
             subGroup.get(x).add(stub);
             x = (x + 1) % numGossipSendingWorker;
-//            gossiperExecutors.schedule(new GossiperTask(stub), delay, unit)
-            gossiperExecutors.scheduleAtFixedRate(new GossiperTask(stub), 1000, 1000, TimeUnit.MILLISECONDS);
+//            gossiperExecutors.scheduleAtFixedRate(new GossiperTask(stub), 1000, 1000, TimeUnit.MILLISECONDS);
         }
-//        Timer[] gossipSendingWorkers = new Timer[numGossipSendingWorker];
-//        gossipTasks = new GroupedGossiperTask[numGossipSendingWorker];
-//        for (int i = 0; i < numGossipSendingWorker; ++i) {
-//            gossipSendingWorkers[i] = new Timer();
-//            gossipTasks[i] = new GroupedGossiperTask(subGroup.get(i));
-//            gossipSendingWorkers[i].schedule(gossipTasks[i], 0, 1000);
-//        }
+        Timer[] gossipSendingWorkers = new Timer[numGossipSendingWorker];
+        gossipTasks = new GroupedGossiperTask[numGossipSendingWorker];
+        for (int i = 0; i < numGossipSendingWorker; ++i) {
+            gossipSendingWorkers[i] = new Timer();
+            gossipTasks[i] = new GroupedGossiperTask(subGroup.get(i));
+            gossipSendingWorkers[i].schedule(gossipTasks[i], 0, 1000);
+        }
         List<GossiperStub> firstHalf = gossiperGroup.getFirstHalf();
         try {
             startSomeGossipers(firstHalf);
@@ -187,8 +186,8 @@ public class GossipSimulator {
         try {
             Klogger.scale.info("Starting second half");
             startSomeGossipers(secondHalf);
-            Thread.sleep(GossiperStub.RING_DELAY);
-//            Thread.sleep(5000);
+//            Thread.sleep(GossiperStub.RING_DELAY);
+            Thread.sleep(5000);
             for (GossiperStub stub : secondHalf) {
                 stub.setTables(numTables, 1);
             }
@@ -201,6 +200,13 @@ public class GossipSimulator {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        try {
+            Thread.sleep(300000);
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        System.exit(0);
     }
     
     public RandomTokenGossiperStubGroup getGossiperGroup() {
@@ -304,118 +310,118 @@ public class GossipSimulator {
         
     }
     
-//    public static class GroupedGossiperTask extends TimerTask {
-//        
-//        private List<GossiperStub> stubs;
-//        private long previousRun;
-//        private long runningInterval;
-//        private int sendCount;
-//        
-//        private static long maxLate = 0;
-//        
-//        public GroupedGossiperTask(List<GossiperStub> stubs) {
-//            this.stubs = stubs;
-//            previousRun = 0;
-//        }
-//
-//        @Override
-//        public void run() {
-//            Klogger.scale.debug("Sending gossip");
-//            long start = System.currentTimeMillis();
-//            if (previousRun != 0) {
-//                long interval = start - previousRun;
-//                runningInterval += interval;
-//                sendCount++;
-//                if (interval > maxLate) {
-//                    maxLate = interval;
-//                }
-//            }
-//            previousRun = start;
-//            for (GossiperStub performer : stubs) {
-//                if (!performer.isRunning()) {
-//                    continue;
-//                }
-//                InetAddress performerAddress = performer.getInetAddress();
-//                performer.updateHeartBeat();
-//                boolean gossipToSeed = false;
-//                Set<InetAddress> liveEndpoints = performer.getLiveEndpoints();
-//                Set<InetAddress> seeds = performer.getSeeds();
-//                
-//                List<GossipDigest> gDigests = new ArrayList<GossipDigest>();
-//                performer.makeRandomGossipDigest(gDigests);
-//
-//                if (gDigests.size() > 0) {
-//                    MessageIn synMsg = null;
-////                    synMsg = performer.genGossipDigestSyncMsgIn();
-//                    if (!liveEndpoints.isEmpty()) {
-//                        InetAddress liveReceiver = getRandomAddress(liveEndpoints);
-//                        gossipToSeed = seeds.contains(liveReceiver);
-//                        synMsg = performer.genGossipDigestSyncMsgIn();
-//                        synMsg.setTo(liveReceiver);
-//                        if (!msgQueues.get(liveReceiver).add(synMsg)) {
-//                            Klogger.scale.error("Cannot add more message to message queue of " + liveReceiver);
-//                        }
-//                    }
-//                    Map<InetAddress, Long> unreachableEndpoints = performer.getUnreachableEndpoints();
-//                    if (!unreachableEndpoints.isEmpty()) {
-//                        double prob = ((double) unreachableEndpoints.size()) / (liveEndpoints.size() + 1.0);
-//                        if (prob > random.nextDouble()) {
-//                            InetAddress unreachableReceiver = getRandomAddress(unreachableEndpoints.keySet());
-//                            if (unreachableReceiver != null) {
-//                                synMsg = performer.genGossipDigestSyncMsgIn();
-//                                synMsg.setTo(unreachableReceiver);
-//                                if (!msgQueues.get(unreachableReceiver).add(synMsg)) {
-//                                    Klogger.scale.error("Cannot add more message to message queue of " + unreachableReceiver);
-//                                }
-//                            }
-//                        }
-//                    }
-//                    if (!gossipToSeed || liveEndpoints.size() < seeds.size()) {
-//                        int size = seeds.size();
-//                        if (size > 0) {
-//                            if (size == 1 && seeds.contains(performerAddress)) {
-//
-//                            } else {
-//                                if (liveEndpoints.size() == 0) {
-//                                    InetAddress seed = getRandomAddress(seeds);
-//                                    synMsg = performer.genGossipDigestSyncMsgIn();
-//                                    synMsg.setTo(seed);
-//                                    if (!msgQueues.get(seed).add(synMsg)) {
-//                                        Klogger.scale.error("Cannot add more message to message queue of " + seed);
-//                                    }
-//                                } else {
-//                                    double probability = seeds.size() / (double)( liveEndpoints.size() + unreachableEndpoints.size() );
-//                                    double randDbl = random.nextDouble();
-//                                    if (randDbl <= probability) {
-//                                        InetAddress seed = getRandomAddress(seeds);
-//                                        synMsg = performer.genGossipDigestSyncMsgIn();
-//                                        synMsg.setTo(seed);
-//                                        if (!msgQueues.get(seed).add(synMsg)) {
-//                                            Klogger.scale.error("Cannot add more message to message queue of " + seed);
-//                                        }
-//                                    }
-//                                }
-//                            }
-//                        }
-//                    }
-//                    performer.doStatusCheck();
-//                }
-//            }
-//            long gossipingTime = System.currentTimeMillis() - start;
-//            if (gossipingTime > 1000) {
-//                Klogger.scale.warn("It took more than 1 s (" + gossipingTime + " ms) to do gossip task");
-//            }
-//        }
-//        
-//        public double averageInterval() {
-//            return (double) runningInterval / (double) sendCount;
-//        }
-//        
-//        public static double getMaxLate() {
-//            return maxLate;
-//        }
-//        
-//    }
+    public static class GroupedGossiperTask extends TimerTask {
+        
+        private List<GossiperStub> stubs;
+        private long previousRun;
+        private long runningInterval;
+        private int sendCount;
+        
+        private static long maxLate = 0;
+        
+        public GroupedGossiperTask(List<GossiperStub> stubs) {
+            this.stubs = stubs;
+            previousRun = 0;
+        }
+
+        @Override
+        public void run() {
+            Klogger.scale.debug("Sending gossip");
+            long start = System.currentTimeMillis();
+            if (previousRun != 0) {
+                long interval = start - previousRun;
+                runningInterval += interval;
+                sendCount++;
+                if (interval > maxLate) {
+                    maxLate = interval;
+                }
+            }
+            previousRun = start;
+            for (GossiperStub performer : stubs) {
+                if (!performer.isRunning()) {
+                    continue;
+                }
+                InetAddress performerAddress = performer.getInetAddress();
+                performer.updateHeartBeat();
+                boolean gossipToSeed = false;
+                Set<InetAddress> liveEndpoints = performer.getLiveEndpoints();
+                Set<InetAddress> seeds = performer.getSeeds();
+                
+                List<GossipDigest> gDigests = new ArrayList<GossipDigest>();
+                performer.makeRandomGossipDigest(gDigests);
+
+                if (gDigests.size() > 0) {
+                    MessageIn synMsg = null;
+//                    synMsg = performer.genGossipDigestSyncMsgIn();
+                    if (!liveEndpoints.isEmpty()) {
+                        InetAddress liveReceiver = getRandomAddress(liveEndpoints);
+                        gossipToSeed = seeds.contains(liveReceiver);
+                        synMsg = performer.genGossipDigestSyncMsgIn();
+                        synMsg.setTo(liveReceiver);
+                        if (!msgQueues.get(liveReceiver).add(synMsg)) {
+                            Klogger.scale.error("Cannot add more message to message queue of " + liveReceiver);
+                        }
+                    }
+                    Map<InetAddress, Long> unreachableEndpoints = performer.getUnreachableEndpoints();
+                    if (!unreachableEndpoints.isEmpty()) {
+                        double prob = ((double) unreachableEndpoints.size()) / (liveEndpoints.size() + 1.0);
+                        if (prob > random.nextDouble()) {
+                            InetAddress unreachableReceiver = getRandomAddress(unreachableEndpoints.keySet());
+                            if (unreachableReceiver != null) {
+                                synMsg = performer.genGossipDigestSyncMsgIn();
+                                synMsg.setTo(unreachableReceiver);
+                                if (!msgQueues.get(unreachableReceiver).add(synMsg)) {
+                                    Klogger.scale.error("Cannot add more message to message queue of " + unreachableReceiver);
+                                }
+                            }
+                        }
+                    }
+                    if (!gossipToSeed || liveEndpoints.size() < seeds.size()) {
+                        int size = seeds.size();
+                        if (size > 0) {
+                            if (size == 1 && seeds.contains(performerAddress)) {
+
+                            } else {
+                                if (liveEndpoints.size() == 0) {
+                                    InetAddress seed = getRandomAddress(seeds);
+                                    synMsg = performer.genGossipDigestSyncMsgIn();
+                                    synMsg.setTo(seed);
+                                    if (!msgQueues.get(seed).add(synMsg)) {
+                                        Klogger.scale.error("Cannot add more message to message queue of " + seed);
+                                    }
+                                } else {
+                                    double probability = seeds.size() / (double)( liveEndpoints.size() + unreachableEndpoints.size() );
+                                    double randDbl = random.nextDouble();
+                                    if (randDbl <= probability) {
+                                        InetAddress seed = getRandomAddress(seeds);
+                                        synMsg = performer.genGossipDigestSyncMsgIn();
+                                        synMsg.setTo(seed);
+                                        if (!msgQueues.get(seed).add(synMsg)) {
+                                            Klogger.scale.error("Cannot add more message to message queue of " + seed);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    performer.doStatusCheck();
+                }
+            }
+            long gossipingTime = System.currentTimeMillis() - start;
+            if (gossipingTime > 1000) {
+                Klogger.scale.warn("It took more than 1 s (" + gossipingTime + " ms) to do gossip task");
+            }
+        }
+        
+        public double averageInterval() {
+            return (double) runningInterval / (double) sendCount;
+        }
+        
+        public static double getMaxLate() {
+            return maxLate;
+        }
+        
+    }
     
     public static class GossipWorker implements Runnable {
         

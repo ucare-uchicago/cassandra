@@ -1765,7 +1765,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         elTime = System.currentTimeMillis() - elTime;
         if (elTime > 2) {
             logger.info("cpr took {} ms", elTime);
-            StackTracePrinter.print();
+//            StackTracePrinter.print();
         }
     }
 
@@ -1861,7 +1861,6 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     }
     
     public static void simulatedCalculatePendingRanges(GossiperStub stub, AbstractReplicationStrategy strategy, String table) {
-        System.out.println(stub + " " + strategy + " " + table);
         TokenMetadata tm = stub.getTokenMetadata();
         Multimap<Range<Token>, InetAddress> pendingRanges = HashMultimap.create();
         BiMultiValMap<Token, InetAddress> bootstrapTokens = tm.getBootstrapTokens();
