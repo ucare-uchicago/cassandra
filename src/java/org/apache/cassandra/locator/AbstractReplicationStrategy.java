@@ -171,7 +171,6 @@ public abstract class AbstractReplicationStrategy
             long sleepTime = GossipSimulator.getMemoizedTime(metadata.getSize());
             Thread.sleep(sleepTime);
             logger.info("gar sleep for {}", sleepTime);
-            StackTracePrinter.print();
         } catch (InterruptedException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
