@@ -39,6 +39,7 @@ public class SimulatedGossipDigestAckVerbHandler implements IVerbHandler<GossipD
 
     public void doVerb(MessageIn<GossipDigestAck> message, String id)
     {
+        long elTime = System.currentTimeMillis();
         InetAddress from = message.from;
         InetAddress to = message.getTo();
         logger.debug("{} receives ack {}", to, from);
@@ -56,11 +57,12 @@ public class SimulatedGossipDigestAckVerbHandler implements IVerbHandler<GossipD
         List<GossipDigest> gDigestList = gDigestAckMessage.getGossipDigestList();
         Map<InetAddress, EndpointState> epStateMap = gDigestAckMessage.getEndpointStateMap();
 
+        int[] result = { 0, 0 };
         if ( epStateMap.size() > 0 )
         {
             /* Notify the Failure Detector */
             Gossiper.notifyFailureDetectorStatic(stub, epStateMap);
-            Gossiper.applyStateLocallyStatic(stub, epStateMap);
+            result = Gossiper.applyStateLocallyStatic(stub, epStateMap);
         }
 
         /* Get the state required to send to this gossipee - construct GossipDigestAck2Message */
@@ -84,5 +86,11 @@ public class SimulatedGossipDigestAckVerbHandler implements IVerbHandler<GossipD
         if (logger.isTraceEnabled())
             logger.trace("Sending a GossipDigestAck2Message to {}", from);
 //        MessagingService.instance().sendOneWay(gDigestAck2Message, from);
+        elTime = System.currentTimeMillis() - elTime;
+        int boot = result[0];
+        int normal = result[1];
+        if (boot != 0 || normal != 0) {
+            logger.info("{} executes ack took {} ms ; boot " + boot + " normal " + normal, from, elTime);
+        }
     }
 }

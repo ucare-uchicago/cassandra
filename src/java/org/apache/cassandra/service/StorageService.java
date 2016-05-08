@@ -1755,18 +1755,19 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
     }
     
     private static void calculatePendingRangesStatic(GossiperStub stub) {
+        int currentRing1 = stub.getTokenMetadata().getSize();
+        int currentBoot1 = stub.getTokenMetadata().getBootstrapTokens().size();
         long elTime = System.currentTimeMillis();
         for (String table : stub.getTables()) {
             long time = System.currentTimeMillis();
             simulatedCalculatePendingRanges(stub, stub.getStrategy(table), table);
             time = System.currentTimeMillis() - time;
-            logger.info("cpr for {} took {} ms", table, time);
+            int currentRing = stub.getTokenMetadata().getSize();
+            int currentBoot = stub.getTokenMetadata().getBootstrapTokens().size();
+            logger.info("cpr for {} took {} ms ; current_ring " + currentRing + " current_boot " + currentBoot, table, time);
         }
         elTime = System.currentTimeMillis() - elTime;
-        if (elTime > 2) {
-            logger.info("cpr took {} ms", elTime);
-//            StackTracePrinter.print();
-        }
+        logger.info("cpr took {} ms ; current_ring " + currentRing1 + " current_boot " + currentBoot1, elTime);
     }
 
     // public & static for testing purposes

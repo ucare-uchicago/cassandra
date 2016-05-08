@@ -34,6 +34,7 @@ public class SimulatedGossipDigestAck2VerbHandler implements IVerbHandler<Gossip
 
     public void doVerb(MessageIn<GossipDigestAck2> message, String id)
     {
+        long elTime = System.currentTimeMillis();
         InetAddress from = message.from;
         InetAddress to = message.getTo();
         logger.debug("{} receives ack2 {}", to, from);
@@ -41,6 +42,12 @@ public class SimulatedGossipDigestAck2VerbHandler implements IVerbHandler<Gossip
         Map<InetAddress, EndpointState> remoteEpStateMap = message.payload.getEndpointStateMap();
         /* Notify the Failure Detector */
         Gossiper.notifyFailureDetectorStatic(stub, remoteEpStateMap);
-        Gossiper.applyStateLocallyStatic(stub, remoteEpStateMap);
+        int[] result = Gossiper.applyStateLocallyStatic(stub, remoteEpStateMap);
+        elTime = System.currentTimeMillis() - elTime;
+        int boot = result[0];
+        int normal = result[1];
+        if (boot != 0 || normal != 0) {
+            logger.info("{} executes ack took {} ms ; boot " + boot + " normal " + normal, from, elTime);
+        }
     }
 }

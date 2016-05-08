@@ -167,6 +167,7 @@ public abstract class AbstractReplicationStrategy
     }
     
     public Multimap<InetAddress, Range<Token>> simulatedGetAddressRanges(TokenMetadata metadata) {
+        long elTime = System.currentTimeMillis();
         try {
             long sleepTime = GossipSimulator.getMemoizedTime(metadata.getSize());
             Thread.sleep(sleepTime);
@@ -175,6 +176,8 @@ public abstract class AbstractReplicationStrategy
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
+        elTime = System.currentTimeMillis() - elTime;
+        logger.info("gAR for {} took {} ms", metadata.sortedTokens().size(), elTime);
         return null;
     }
 
