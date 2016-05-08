@@ -78,8 +78,9 @@ public class BootStrapper
         for (String table : Schema.instance.getNonSystemTables())
         {
             AbstractReplicationStrategy strategy = Table.open(table).getReplicationStrategy();
-            streamer.addRanges(table, strategy.getPendingAddressRanges(tokenMetadata, tokens, address));
+//            streamer.addRanges(table, strategy.getPendingAddressRanges(tokenMetadata, tokens, address));
         }
+        logger.info("I have tables, {}", Schema.instance.getNonSystemTables());
 
         streamer.fetch();
         StorageService.instance.finishBootstrapping();
