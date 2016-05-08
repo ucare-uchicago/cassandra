@@ -59,6 +59,7 @@ public class GossipSimulator {
     public static final int NUM_TOKENS = 32;
     
     private static final Map<Integer, Long> memoizedTime = new HashMap<Integer, Long>();
+    private static final Map<Integer, Long> realMemoizedTime = new HashMap<Integer, Long>();
 
     public static int numNodes;
     public static int ringSize;
@@ -70,8 +71,8 @@ public class GossipSimulator {
     public static boolean added = false;
 
     public static void main(String[] args) throws UnknownHostException {
-        if (args.length < 4) {
-            System.err.println("usage: GossipSimulator <num_nodes> <num_tables> <cpr_file> <num_gossiper>");
+        if (args.length < 5) {
+            System.err.println("usage: GossipSimulator <num_nodes> <num_tables> <cpr_file> <real_cpr_file> <num_gossiper>");
             System.exit(1);
         }
         numNodes = Integer.parseInt(args[0]);
@@ -109,7 +110,28 @@ public class GossipSimulator {
             System.err.println("Cannot read profiling file, " + args[2]);
             System.exit(2);
         }
-        int numGossipSendingWorker = Integer.parseInt(args[3]);
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(args[3]));
+            String line = null;
+            while ((line = reader.readLine()) != null) {
+                String[] entry = line.split(" ");
+                if (entry.length != 2) {
+                    System.err.println("Wrong profiling file format");
+                    System.exit(3);
+                }
+                int tmpSize = Integer.parseInt(entry[0]);
+                long tmpTime = Long.parseLong(entry[1]);
+                realMemoizedTime.put(tmpSize, tmpTime);
+            }
+            reader.close();
+        } catch (FileNotFoundException e) {
+            System.err.println("Cannot open profiling file, " + args[3]);
+            System.exit(2);
+        } catch (IOException e) {
+            System.err.println("Cannot read profiling file, " + args[3]);
+            System.exit(2);
+        }
+        int numGossipSendingWorker = Integer.parseInt(args[4]);
         numGossipSendingWorker = numGossipSendingWorker < 1 ? 1 : numGossipSendingWorker;
         Set<InetAddress> seeds = new HashSet<InetAddress>();
         seeds.add(InetAddress.getByName("127.0.0.1"));
@@ -186,8 +208,8 @@ public class GossipSimulator {
         try {
             Klogger.scale.info("Starting second half");
             startSomeGossipers(secondHalf);
-//            Thread.sleep(GossiperStub.RING_DELAY);
-            Thread.sleep(3000);
+            Thread.sleep(GossiperStub.RING_DELAY);
+//            Thread.sleep(3000);
             for (GossiperStub stub : secondHalf) {
                 stub.setTables(numTables, 1);
             }
@@ -478,11 +500,11 @@ public class GossipSimulator {
 //    }
     
     public static long getMemoizedTime(int size) {
-        Long time = memoizedTime.get(size);
+        Long time = realMemoizedTime.get(size);
+        time = time == null ? memoizedTime.get(size) : time;
         if (time == null) {
             System.out.println(size);
         }
-//        return size == 0 ? 0 : memoizedTime.get(size);
         return time == null ? 10 : time;
     }
     

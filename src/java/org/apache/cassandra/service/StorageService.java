@@ -1758,13 +1758,16 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         int currentRing1 = stub.getTokenMetadata().getSize();
         int currentBoot1 = stub.getTokenMetadata().getBootstrapTokens().size();
         long elTime = System.currentTimeMillis();
-        for (String table : stub.getTables()) {
-            long time = System.currentTimeMillis();
-            simulatedCalculatePendingRanges(stub, stub.getStrategy(table), table);
-            time = System.currentTimeMillis() - time;
-            int currentRing = stub.getTokenMetadata().getSize();
-            int currentBoot = stub.getTokenMetadata().getBootstrapTokens().size();
-            logger.info("cpr for {} took {} ms ; current_ring " + currentRing + " current_boot " + currentBoot, table, time);
+        List<String> tables = stub.getTables();
+        synchronized (tables) {
+            for (String table : tables) {
+                long time = System.currentTimeMillis();
+                simulatedCalculatePendingRanges(stub, stub.getStrategy(table), table);
+                time = System.currentTimeMillis() - time;
+                int currentRing = stub.getTokenMetadata().getSize();
+                int currentBoot = stub.getTokenMetadata().getBootstrapTokens().size();
+                logger.info("cpr for {} took {} ms ; current_ring " + currentRing + " current_boot " + currentBoot, table, time);
+            }
         }
         elTime = System.currentTimeMillis() - elTime;
         logger.info("cpr took {} ms ; current_ring " + currentRing1 + " current_boot " + currentBoot1, elTime);

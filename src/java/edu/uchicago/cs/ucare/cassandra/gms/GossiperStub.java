@@ -166,7 +166,9 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
     }
     
     public void setTables(int numTables, int replicationFactor) {
-        tables.clear();
+        synchronized (tables) {
+            tables.clear();
+        }
         strategies.clear();
         SimpleSnitch simpleSnitch = new SimpleSnitch();
         DynamicEndpointSnitch dynamicSnitch = new DynamicEndpointSnitch(simpleSnitch);
@@ -175,7 +177,9 @@ public class GossiperStub implements InetAddressStub, IFailureDetectionEventList
         TokenMetadata testStubTokenMetadata = getTokenMetadata();
         for (int i = 0; i < numTables; ++i) {
             String tableName = "KeySpace" + i;
-            tables.add(tableName);
+            synchronized (tables) {
+                tables.add(tableName);
+            }
             NetworkTopologyStrategy strategy;
             try {
                 strategy = new NetworkTopologyStrategy(tableName, 
