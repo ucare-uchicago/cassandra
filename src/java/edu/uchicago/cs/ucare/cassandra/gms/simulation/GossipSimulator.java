@@ -216,6 +216,7 @@ public class GossipSimulator {
 //            Thread.sleep(GossiperStub.RING_DELAY);
             String delayVar = System.getenv("DELAY");
             long delayBetweenBoot = delayVar == null ? 1500 : Long.parseLong(delayVar);
+            Klogger.scale.info("Delay between boot is {}", delayBetweenBoot);
             Thread.sleep(delayBetweenBoot);
 //            Thread.sleep(7000);
             for (GossiperStub stub : secondHalf) {
