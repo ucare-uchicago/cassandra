@@ -1,0 +1,23 @@
+#!/bin/sh
+
+scriptdir=`dirname $0`
+. $scriptdir/readconfig
+
+classpath=$scriptdir/../build/classes/main:$scriptdir/../build/classes/thrift:$scriptdir/../test/conf
+for jar in ls $scriptdir/../lib/*.jar; do
+  classpath=$classpath:$jar
+done
+for jar in ls $scriptdir/../build/lib/jars/*.jar; do
+  classpath=$classpath:$jar
+done
+
+#for 64
+#export DELAY=1500
+#for 128
+#export DELAY=1500
+#for 256
+#export DELAY=1500
+java -Xmx16G -Xms16G -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCApplicationStoppedTime \
+    -XX:+PrintGCApplicationConcurrentTime -Xloggc:/tmp/gc -classpath $classpath \
+    -Doperating.dir=$operating_dir -Dlog4j.configuration=log4j-server.properties \
+    edu.uchicago.cs.ucare.cassandra.gms.simulation.GossipSimulator $num_node 20 $scriptdir/../profiling $scriptdir/../real-profiling 16
