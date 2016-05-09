@@ -201,11 +201,11 @@ public class GossipSimulator {
             stub.setTables(numTables, 1);
         }
         Klogger.scale.info("First half is stable");
-        try {
-            Thread.sleep(30);
-        } catch (InterruptedException e1) {
-            e1.printStackTrace();
-        }
+//        try {
+//            Thread.sleep(30);
+//        } catch (InterruptedException e1) {
+//            e1.printStackTrace();
+//        }
         Thread clusterMonitor = new Thread(new ClusterMonitor());
         clusterMonitor.start();
         added = true;
@@ -213,8 +213,11 @@ public class GossipSimulator {
         try {
             Klogger.scale.info("Starting second half");
             startSomeGossipers(secondHalf);
-            Thread.sleep(GossiperStub.RING_DELAY);
-//            Thread.sleep(3000);
+//            Thread.sleep(GossiperStub.RING_DELAY);
+            String delayVar = System.getenv("DELAY");
+            long delayBetweenBoot = delayVar == null ? 1500 : Long.parseLong(delayVar);
+            Thread.sleep(delayBetweenBoot);
+//            Thread.sleep(7000);
             for (GossiperStub stub : secondHalf) {
                 stub.setTables(numTables, 1);
             }
@@ -505,8 +508,9 @@ public class GossipSimulator {
 //    }
     
     public static long getMemoizedTime(int size) {
-        Long time = realMemoizedTime.get(size);
-        time = time == null ? memoizedTime.get(size) : time;
+//        Long time = realMemoizedTime.get(size);
+//        time = time == null ? memoizedTime.get(size) : time;
+        Long time = memoizedTime.get(size);
         if (time == null) {
             System.out.println(size);
         }

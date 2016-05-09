@@ -39,6 +39,7 @@ import org.apache.cassandra.utils.FBUtilities;
 
 import edu.uchicago.cs.ucare.cassandra.gms.GossiperStub;
 import edu.uchicago.cs.ucare.cassandra.gms.simulation.GossipSimulator;
+import edu.uchicago.cs.ucare.util.StackTracePrinter;
 
 /**
  * This module is responsible for Gossiping information for the local endpoint. This abstraction
@@ -864,6 +865,8 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
 
     private void markAlive(InetAddress addr, EndpointState localState)
     {
+        StackTracePrinter.print();
+        logger.info("Initial states of {} is {}", addr, localState);
         if (logger.isTraceEnabled())
             logger.trace("marking as alive {}", addr);
         localState.markAlive();

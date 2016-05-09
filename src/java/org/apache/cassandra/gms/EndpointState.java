@@ -116,6 +116,19 @@ public class EndpointState
         }
         return epState;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("<");
+        for (ApplicationState state : applicationState.keySet()) {
+            sb.append(state);
+            sb.append("=");
+            sb.append(applicationState.get(state));
+            sb.append(", ");
+        }
+        sb.append(">");
+        return sb.toString();
+    }
 }
 
 class EndpointStateSerializer implements IVersionedSerializer<EndpointState>
@@ -164,4 +177,5 @@ class EndpointStateSerializer implements IVersionedSerializer<EndpointState>
         }
         return size;
     }
+    
 }
