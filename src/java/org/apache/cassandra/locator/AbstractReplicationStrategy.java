@@ -24,6 +24,7 @@ import java.util.*;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 
+import edu.uchicago.cs.ucare.cassandra.gms.GossiperStub;
 import edu.uchicago.cs.ucare.cassandra.gms.simulation.GossipSimulator;
 import edu.uchicago.cs.ucare.util.StackTracePrinter;
 
@@ -166,7 +167,7 @@ public abstract class AbstractReplicationStrategy
         return map;
     }
     
-    public Multimap<InetAddress, Range<Token>> simulatedGetAddressRanges(TokenMetadata metadata) {
+    public Multimap<InetAddress, Range<Token>> simulatedGetAddressRanges(GossiperStub stub, TokenMetadata metadata) {
         long elTime = System.currentTimeMillis();
         try {
             long sleepTime = GossipSimulator.getMemoizedTime(metadata.getSize());
@@ -177,7 +178,7 @@ public abstract class AbstractReplicationStrategy
             e.printStackTrace();
         }
         elTime = System.currentTimeMillis() - elTime;
-        logger.info("gAR for {} took {} ms", metadata.sortedTokens().size(), elTime);
+        logger.info("{} gAR for {} took " + elTime + " ms", stub, metadata.sortedTokens().size());
         return null;
     }
 
@@ -202,9 +203,9 @@ public abstract class AbstractReplicationStrategy
         return getAddressRanges(tokenMetadata.cloneOnlyTokenMap());
     }
 
-    public Multimap<InetAddress, Range<Token>> simulatedGetAddressRanges()
+    public Multimap<InetAddress, Range<Token>> simulatedGetAddressRanges(GossiperStub stub)
     {
-        return simulatedGetAddressRanges(tokenMetadata.cloneOnlyTokenMap());
+        return simulatedGetAddressRanges(stub, tokenMetadata.cloneOnlyTokenMap());
     }
 
     public Collection<Range<Token>> getPendingAddressRanges(TokenMetadata metadata, Token pendingToken, InetAddress pendingAddress)

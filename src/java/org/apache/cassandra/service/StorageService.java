@@ -1766,11 +1766,11 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
                 time = System.currentTimeMillis() - time;
                 int currentRing = stub.getTokenMetadata().getSize();
                 int currentBoot = stub.getTokenMetadata().getBootstrapTokens().size();
-                logger.info("cpr for {} took {} ms ; current_ring " + currentRing + " current_boot " + currentBoot, table, time);
+                logger.info(stub + " cpr for {} took {} ms ; current_ring " + currentRing + " current_boot " + currentBoot, table, time);
             }
         }
         elTime = System.currentTimeMillis() - elTime;
-        logger.info("cpr took {} ms ; current_ring " + currentRing1 + " current_boot " + currentBoot1, elTime);
+        logger.info(stub + " cpr took {} ms ; current_ring " + currentRing1 + " current_boot " + currentBoot1, elTime);
     }
 
     // public & static for testing purposes
@@ -1794,6 +1794,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 
         // Copy of metadata reflecting the situation after all leave operations are finished.
         TokenMetadata allLeftMetadata = tm.cloneAfterAllLeft();
+        logger.info("cpr tm_size {} all_left {}", tm.getSize(), allLeftMetadata.getSize());
 
         // get all ranges that will be affected by leaving nodes
         Set<Range<Token>> affectedRanges = new HashSet<Range<Token>>();
@@ -1874,11 +1875,12 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         {
             if (logger.isDebugEnabled())
                 logger.debug("No bootstrapping, leaving or moving nodes, and no relocating tokens -> empty pending ranges for {}", table);
+            logger.info("No bootstrapping, leaving or moving nodes, and no relocating tokens -> empty pending ranges for {}", table);
             tm.setPendingRanges(table, pendingRanges);
             return;
         }
 
-        Multimap<InetAddress, Range<Token>> addressRanges = strategy.simulatedGetAddressRanges();
+        Multimap<InetAddress, Range<Token>> addressRanges = strategy.simulatedGetAddressRanges(stub);
 
         // Copy of metadata reflecting the situation after all leave operations are finished.
         TokenMetadata allLeftMetadata = tm.cloneAfterAllLeft();
@@ -1906,7 +1908,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
             Collection<Token> tokens = bootstrapTokens.inverse().get(endpoint);
             
             allLeftMetadata.updateNormalTokens(tokens, endpoint);
-            strategy.simulatedGetAddressRanges(allLeftMetadata);
+            strategy.simulatedGetAddressRanges(stub, allLeftMetadata);
 //            for (Range<Token> range : strategy.simulatedGetAddressRanges(allLeftMetadata).get(endpoint))
 //                pendingRanges.put(range, endpoint);
             allLeftMetadata.removeEndpoint(endpoint);

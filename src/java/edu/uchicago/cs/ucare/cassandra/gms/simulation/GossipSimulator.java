@@ -201,6 +201,11 @@ public class GossipSimulator {
             stub.setTables(numTables, 1);
         }
         Klogger.scale.info("First half is stable");
+        try {
+            Thread.sleep(30);
+        } catch (InterruptedException e1) {
+            e1.printStackTrace();
+        }
         Thread clusterMonitor = new Thread(new ClusterMonitor());
         clusterMonitor.start();
         added = true;

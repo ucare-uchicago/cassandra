@@ -272,8 +272,10 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     public void removeEndpoint(InetAddress endpoint)
     {
         // do subscribers first so anything in the subscriber that depends on gossiper state won't get confused
-        for (IEndpointStateChangeSubscriber subscriber : subscribers)
+        for (IEndpointStateChangeSubscriber subscriber : subscribers) {
             subscriber.onRemove(endpoint);
+            logger.info("korn test {}", subscriber.getClass().getName());
+        }
 
         liveEndpoints.remove(endpoint);
         unreachableEndpoints.remove(endpoint);

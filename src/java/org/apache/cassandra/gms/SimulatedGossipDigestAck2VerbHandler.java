@@ -47,7 +47,7 @@ public class SimulatedGossipDigestAck2VerbHandler implements IVerbHandler<Gossip
         int boot = result[0];
         int normal = result[1];
         if (boot != 0 || normal != 0) {
-            logger.info("{} executes ack took {} ms ; boot " + boot + " normal " + normal, from, elTime);
+            logger.info("{} {} executes ack2 took " + elTime + " ms ; boot " + boot + " normal " + normal, to, from);
         }
     }
 }
