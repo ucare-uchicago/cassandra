@@ -1753,6 +1753,9 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         }
         elTime = System.currentTimeMillis() - elTime;
         logger.info("cpr took {} ms ; current_ring " + currentRing1 + " current_boot " + currentBoot1, elTime);
+        if (elTime > 10) {
+            StackTracePrinter.print();
+        }
         return elTime;
     }
     
