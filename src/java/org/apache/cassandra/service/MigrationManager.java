@@ -56,15 +56,15 @@ public class MigrationManager implements IEndpointStateChangeSubscriber
     private static final ByteBuffer LAST_MIGRATION_KEY = ByteBufferUtil.bytes("Last Migration");
 
     public int[] onJoin(InetAddress endpoint, EndpointState epState)
-    {return new int[] {0, 0}; }
+    {return new int[] {0, 0, 0}; }
 
     public int[] onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
     {
         if (state != ApplicationState.SCHEMA || endpoint.equals(FBUtilities.getBroadcastAddress()))
-            return new int[] { 0, 0 };
+            return new int[] { 0, 0, 0 };
 
         rectifySchema(UUID.fromString(value.value), endpoint);
-        return new int[] { 0, 0 };
+        return new int[] { 0, 0, 0 };
     }
 
     public void onAlive(InetAddress endpoint, EndpointState state)

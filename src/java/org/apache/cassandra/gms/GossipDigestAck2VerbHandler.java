@@ -45,8 +45,9 @@ public class GossipDigestAck2VerbHandler implements IVerbHandler<GossipDigestAck
         elTime = System.currentTimeMillis() - elTime;
         int boot = result[0];
         int normal = result[1];
+        int cprTime = result[2];
         if (boot != 0 || normal != 0) {
-            logger.info("{} executes ack took {} ms ; boot " + boot + " normal " + normal, from, elTime);
+            logger.info("{} executes ack2 took {} ms ; boot " + boot + " normal " + normal + " cpr_time " + cprTime, from, elTime);
         }
     }
 }

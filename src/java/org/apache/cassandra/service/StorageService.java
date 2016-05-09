@@ -1102,7 +1102,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
      */
     public int[] onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
     {
-        int result[] = { 0, 0 };
+        int result[] = { 0, 0, 0 };
         switch (state)
         {
             case STATUS:
@@ -1113,10 +1113,10 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
                 String moveName = pieces[0];
 
                 if (moveName.equals(VersionedValue.STATUS_BOOTSTRAPPING)) {
-                    handleStateBootstrap(endpoint, pieces);
+                    result[2] = (int) handleStateBootstrap(endpoint, pieces);
                     result[0] += 1;
                 } else if (moveName.equals(VersionedValue.STATUS_NORMAL)) {
-                    handleStateNormal(endpoint, pieces);
+                    result[2] = (int) handleStateNormal(endpoint, pieces);
                     result[1] += 1;
                 } else if (moveName.equals(VersionedValue.REMOVING_TOKEN) || moveName.equals(VersionedValue.REMOVED_TOKEN))
                     handleStateRemoving(endpoint, pieces);
@@ -1212,7 +1212,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
      * @param endpoint bootstrapping node
      * @param pieces STATE_BOOTSTRAPPING,bootstrap token as string
      */
-    private void handleStateBootstrap(InetAddress endpoint, String[] pieces)
+    private long handleStateBootstrap(InetAddress endpoint, String[] pieces)
     {
         logger.info("{} is boot", endpoint);
         assert pieces.length >= 2;
@@ -1246,10 +1246,11 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         }
 
         tokenMetadata.addBootstrapTokens(tokens, endpoint);
-        calculatePendingRanges();
+        long cprTime = calculatePendingRanges();
 
         if (Gossiper.instance.usesHostId(endpoint))
             tokenMetadata.updateHostId(Gossiper.instance.getHostId(endpoint), endpoint);
+        return cprTime;
     }
     
     private static void handleStateBootstrapStatic(GossiperStub stub, InetAddress endpoint, String[] pieces) {
@@ -1300,7 +1301,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
      * @param endpoint node
      * @param pieces STATE_NORMAL,token
      */
-    private void handleStateNormal(final InetAddress endpoint, String[] pieces)
+    private long handleStateNormal(final InetAddress endpoint, String[] pieces)
     {
         logger.info("{} is normal", endpoint);
         assert pieces.length >= 2;
@@ -1417,7 +1418,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         if (tokenMetadata.isMoving(endpoint)) // if endpoint was moving to a new token
             tokenMetadata.removeFromMoving(endpoint);
 
-        calculatePendingRanges();
+        return calculatePendingRanges();
     }
     
     private static void handleStateNormalStatic(final GossiperStub stub, final InetAddress endpoint, String[] pieces) {
@@ -1737,7 +1738,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
      * NOTE: This is heavy and ineffective operation. This will be done only once when a node
      * changes state in the cluster, so it should be manageable.
      */
-    private void calculatePendingRanges()
+    private long calculatePendingRanges()
     {
         int currentRing1 = getTokenMetadata().getSize();
         int currentBoot1 = getTokenMetadata().getBootstrapTokens().size();
@@ -1752,6 +1753,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
         }
         elTime = System.currentTimeMillis() - elTime;
         logger.info("cpr took {} ms ; current_ring " + currentRing1 + " current_boot " + currentBoot1, elTime);
+        return elTime;
     }
     
     private static void calculatePendingRangesStatic(GossiperStub stub) {
@@ -2127,7 +2129,7 @@ public class StorageService implements IEndpointStateChangeSubscriber, StorageSe
 
     public int[] onJoin(InetAddress endpoint, EndpointState epState)
     {
-        int result[] = { 0, 0 };
+        int result[] = { 0, 0, 0 };
         for (Map.Entry<ApplicationState, VersionedValue> entry : epState.getApplicationStateMap().entrySet())
         {
             int[] tmp = onChange(endpoint, entry.getKey(), entry.getValue());

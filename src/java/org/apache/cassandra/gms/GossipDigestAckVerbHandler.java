@@ -51,7 +51,7 @@ public class GossipDigestAckVerbHandler implements IVerbHandler<GossipDigestAck>
         List<GossipDigest> gDigestList = gDigestAckMessage.getGossipDigestList();
         Map<InetAddress, EndpointState> epStateMap = gDigestAckMessage.getEndpointStateMap();
 
-        int result[] = { 0, 0 };
+        int result[] = { 0, 0, 0 };
         if ( epStateMap.size() > 0 )
         {
             /* Notify the Failure Detector */
@@ -78,8 +78,9 @@ public class GossipDigestAckVerbHandler implements IVerbHandler<GossipDigestAck>
         elTime = System.currentTimeMillis() - elTime;
         int boot = result[0];
         int normal = result[1];
+        int cprTime = result[2];
         if (boot != 0 || normal != 0) {
-            logger.info("{} executes ack took {} ms ; boot " + boot + " normal " + normal, from, elTime);
+            logger.info("{} executes ack took {} ms ; boot " + boot + " normal " + normal + " cpr_time " + cprTime, from, elTime);
         }
     }
 }

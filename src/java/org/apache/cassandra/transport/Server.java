@@ -211,12 +211,12 @@ public class Server implements CassandraDaemon.Server
             // TODO: we don't gossip the native protocol ip/port yet, so use the
             // endpoint address and ip on which this server is listening instead.
             server.connectionTracker.send(Event.TopologyChange.newNode(endpoint, server.socket.getPort()));
-            return new int[] { 0, 0 };
+            return new int[] { 0, 0, 0 };
         }
 
         public int[] onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
         {
-            return new int[] { 0, 0 };
+            return new int[] { 0, 0, 0 };
         }
 
         public void onAlive(InetAddress endpoint, EndpointState state)

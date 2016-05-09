@@ -198,7 +198,6 @@ public class TokenMetadata
                     }
                 }
             }
-            StackTracePrinter.print();
 
             if (shouldSortTokens)
                 sortedTokens = sortTokens();

@@ -44,9 +44,9 @@ public class LoadBroadcaster implements IEndpointStateChangeSubscriber
     public int[] onChange(InetAddress endpoint, ApplicationState state, VersionedValue value)
     {
         if (state != ApplicationState.LOAD)
-            return new int[] { 0, 0 };
+            return new int[] { 0, 0, 0 };
         loadInfo.put(endpoint, Double.valueOf(value.value));
-        return new int[] { 0, 0 };
+        return new int[] { 0, 0, 0 };
     }
 
     public int[] onJoin(InetAddress endpoint, EndpointState epState)
@@ -56,7 +56,7 @@ public class LoadBroadcaster implements IEndpointStateChangeSubscriber
         {
             onChange(endpoint, ApplicationState.LOAD, localValue);
         }
-        return new int[] { 0, 0 };
+        return new int[] { 0, 0, 0 };
     }
 
     public void onAlive(InetAddress endpoint, EndpointState state) {}

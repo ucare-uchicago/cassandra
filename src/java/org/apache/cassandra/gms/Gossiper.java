@@ -901,7 +901,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
      */
     private int[] handleMajorStateChange(InetAddress ep, EndpointState epState)
     {
-        int result[] = { 0, 0 };
+        int result[] = { 0, 0, 0 };
         if (!isDeadState(epState))
         {
             if (endpointStateMap.get(ep) != null)
@@ -980,7 +980,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
 
     int[] applyStateLocally(Map<InetAddress, EndpointState> epStateMap)
     {
-        int result[] = { 0, 0 };
+        int result[] = { 0, 0, 0 };
         for (Entry<InetAddress, EndpointState> entry : epStateMap.entrySet())
         {
             InetAddress ep = entry.getKey();
@@ -1118,7 +1118,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
 
     private int[] applyNewStates(InetAddress addr, EndpointState localState, EndpointState remoteState)
     {
-        int result[] = { 0, 0 };
+        int result[] = { 0, 0, 0 };
         // don't assert here, since if the node restarts the version will go back to zero
         int oldVersion = localState.getHeartBeatState().getHeartBeatVersion();
 
@@ -1176,7 +1176,7 @@ public class Gossiper implements IFailureDetectionEventListener, GossiperMBean
     // notify that an application state has changed
     private int[] doNotifications(InetAddress addr, ApplicationState state, VersionedValue value)
     {
-        int result[] = { 0, 0 };
+        int result[] = { 0, 0, 0 };
         for (IEndpointStateChangeSubscriber subscriber : subscribers)
         {
             int[] tmp = subscriber.onChange(addr, state, value);
